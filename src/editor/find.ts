@@ -40,7 +40,20 @@ export const findExtensions = [
           else findNext(view);
         }
       });
-      dom.append(input);
+      const count = document.createElement("span");
+      count.className = "find-count";
+      count.setAttribute("role", "status");
+      const updateCount = () => {
+        const query = getSearchQuery(view.state);
+        let total = 0;
+        if (query.valid && query.search) {
+          const cursor = query.getCursor(view.state);
+          while (!cursor.next().done) total++;
+        }
+        count.textContent = `${total} ${total === 1 ? "match" : "matches"}`;
+      };
+      updateCount();
+      dom.append(input, count);
       for (const [label, action] of [
         ["Previous", () => findPrevious(view)],
         ["Next", () => findNext(view)],
@@ -60,6 +73,15 @@ export const findExtensions = [
       }
       return {
         dom,
+        update(update) {
+          if (
+            update.docChanged ||
+            getSearchQuery(update.startState) !== getSearchQuery(update.state)
+          ) {
+            input.value = getSearchQuery(update.state).search;
+            updateCount();
+          }
+        },
         mount() {
           input.focus();
           input.select();

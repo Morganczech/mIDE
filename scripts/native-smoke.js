@@ -183,6 +183,32 @@
       !!document.querySelector(".cm-searchMatch"),
       "find highlights matches",
     );
+    check(
+      document.querySelector(".find-count").textContent === "1 match",
+      "Find shows occurrence count",
+    );
+    window.__mideView.dispatch({
+      changes: {
+        from: window.__mideView.state.doc.length,
+        insert: "\n<!-- Hello -->",
+      },
+    });
+    check(
+      document.querySelector(".find-count").textContent === "2 matches",
+      "Find count updates after editing",
+    );
+    input.value = "NoSuchMatch987";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    check(
+      document.querySelector(".find-count").textContent === "0 matches",
+      "Find shows zero occurrences",
+    );
+    window.__mideView.dispatch({
+      changes: {
+        from: window.__mideView.state.doc.length - "\n<!-- Hello -->".length,
+        to: window.__mideView.state.doc.length,
+      },
+    });
     await click("Close");
     const beforeSettings = window.__mideView.state.doc;
     const changeField = async (element, value) => {
@@ -694,11 +720,257 @@
       !document.querySelector(".error-strip"),
       `no runtime error: ${document.querySelector(".error-strip")?.textContent}`,
     );
+    // Exercise import UI without opening a blocking native picker in automation.
+    await menu("Settings");
+    const priorThemes = localStorage.getItem("mide-custom-themes");
+    let themePayload = JSON.stringify({
+      version: 1,
+      name: "Smoke Theme",
+      variant: "light",
+      colors: { bg: "#e0e8f0", "terminal-blue": "#123456" },
+    });
+    await invoke("create_entry", {
+      path: "smoke-theme.json",
+      directory: false,
+    });
+    let themeFile = await invoke("read_file", { path: "smoke-theme.json" });
+    await invoke("save_file", {
+      path: "smoke-theme.json",
+      text: themePayload,
+      revision: themeFile.revision,
+      bom: false,
+    });
+    try {
+      await click("Import Theme…");
+      await until(
+        () =>
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--bg")
+            .trim() === "#e0e8f0",
+        "custom theme applied",
+      );
+      check(
+        JSON.parse(localStorage.getItem("mide-custom-themes")).some(
+          (item) => item.name === "Smoke Theme",
+        ),
+        "imported theme persists locally",
+      );
+      check(
+        terminal.options.theme.blue === "#123456",
+        "import updates running terminal ANSI colors",
+      );
+      themeFile = await invoke("read_file", { path: "smoke-theme.json" });
+      await invoke("save_file", {
+        path: "smoke-theme.json",
+        text: "{broken",
+        revision: themeFile.revision,
+        bom: false,
+      });
+      await click("Import Theme…");
+      check(
+        document.querySelector("[role=alert]") &&
+          document.documentElement.dataset.theme === "light",
+        "invalid import reports error and preserves current theme",
+      );
+      document.querySelector('[aria-label="Remove theme Smoke Theme"]').click();
+      await wait(80);
+      check(
+        !document.querySelector('[aria-label="Remove theme Smoke Theme"]') &&
+          document.documentElement.style.getPropertyValue("--bg") === "",
+        "removing selected import restores base theme",
+      );
+    } finally {
+      await invoke("delete_entry", { path: "smoke-theme.json" });
+      if (priorThemes === null) localStorage.removeItem("mide-custom-themes");
+      else localStorage.setItem("mide-custom-themes", priorThemes);
+    }
+    document.querySelector(".settings-header button").click();
+    await wait(80);
+    const beforeAbout = window.__mideView.state.doc.toString();
+    await menu("About mIDE");
+    const about = await until(
+      () => document.querySelector(".about-dialog[open]"),
+      "About dialog",
+    );
+    check(
+      about.textContent.includes("minimal IDE") &&
+        about.textContent.includes("Morganczech") &&
+        about.querySelector(".about-version").textContent === "0.1.0",
+      "About contains app version, purpose and author",
+    );
+    check(
+      about.querySelector("input").value ===
+        "https://github.com/Morganczech/mIDE" &&
+        about
+          .querySelector("pre")
+          .textContent.includes("Permission is hereby granted"),
+      "About includes repository and complete MIT license",
+    );
+    key("j");
+    check(about.open, "application shortcuts do not interfere with About");
+    about.dispatchEvent(new Event("cancel", { cancelable: true }));
+    await wait(80);
+    check(
+      !document.querySelector(".about-dialog") &&
+        window.__mideView.contentDOM === document.activeElement &&
+        window.__mideView.state.doc.toString() === beforeAbout,
+      "About Escape restores editor focus without changing document",
+    );
+    await menu("About mIDE");
+    await click("Close");
+    check(
+      !document.querySelector(".about-dialog"),
+      "About closes with Close button",
+    );
+    const projectText = window.__mideView.state.doc.toString();
+    window.__mideView.dispatch({
+      changes: {
+        from: window.__mideView.state.doc.length,
+        insert: "\n<!-- 😀 MIDE_SEARCH_NEEDLE -->",
+      },
+    });
+    await invoke("create_entry", { path: "search-test.txt", directory: false });
+    const searchData = await invoke("read_file", { path: "search-test.txt" });
+    await invoke("save_file", {
+      path: "search-test.txt",
+      revision: searchData.revision,
+      bom: false,
+      text: "first\n😀 MIDE_SEARCH_NEEDLE again\n",
+    });
+    try {
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "f",
+          ctrlKey: true,
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      const searchInput = await until(
+        () => document.querySelector('[aria-label="Find in project"]'),
+        "project search shortcut",
+      );
+      await changeField(searchInput, "mide_search_needle");
+      await click("Search");
+      await until(
+        () =>
+          document.querySelectorAll(".project-search-results li").length === 2,
+        "project search results including unsaved file",
+      );
+      check(
+        document
+          .querySelector(".search-summary")
+          .textContent.includes("2 matches in 2 files"),
+        "project search counts matches across disk and unsaved buffers",
+      );
+      const result = [
+        ...document.querySelectorAll(".project-search-results button"),
+      ].find((button) => button.textContent.includes("search-test.txt"));
+      result.click();
+      await until(
+        () => window.__mideView.state.doc.toString().startsWith("first"),
+        "open global search result",
+      );
+      check(
+        window.__mideView.state.sliceDoc(
+          window.__mideView.state.selection.main.from,
+          window.__mideView.state.selection.main.to,
+        ) === "MIDE_SEARCH_NEEDLE",
+        "project search opens exact match with Unicode column",
+      );
+      const snapshot = window.__mideView.state.doc;
+      await menu("Find in Project");
+      await click("Close");
+      check(
+        window.__mideView.state.doc.eq(snapshot),
+        "closing project search preserves document",
+      );
+      await click("index.astro");
+      window.__mideView.dispatch({
+        changes: {
+          from: 0,
+          to: window.__mideView.state.doc.length,
+          insert: projectText,
+        },
+      });
+    } finally {
+      await invoke("delete_entry", { path: "search-test.txt" });
+    }
+    const mdxSource =
+      '---\ntitle: Hello MDX\n---\n\nimport Card from "./Card.astro"\n\nexport const count = 2\n\n# Hello\n\n<Card title="Hello" count={count} />\n';
+    await invoke("create_entry", {
+      path: "sample-mdx-test.mdx",
+      directory: false,
+    });
+    const mdxData = await invoke("read_file", { path: "sample-mdx-test.mdx" });
+    await invoke("save_file", {
+      path: "sample-mdx-test.mdx",
+      revision: mdxData.revision,
+      bom: false,
+      text: mdxSource,
+    });
+    try {
+      document.querySelector('[aria-label="Project actions"]').click();
+      await click("Refresh");
+      await click("sample-mdx-test.mdx");
+      await until(
+        () => window.__mideView.state.doc.toString() === mdxSource,
+        "open MDX document",
+      );
+      await until(
+        () =>
+          [...document.querySelectorAll(".cm-content span")].some(
+            (span) => span.textContent === "import" && span.className,
+          ),
+        "MDX highlighting in native WebKit",
+      );
+      check(
+        !!document.querySelector(
+          "[role=tab][aria-selected=true] .file-type-icon",
+        ),
+        "MDX file has a monochrome icon",
+      );
+      const importToken = () =>
+        [...document.querySelectorAll(".cm-content span")].find(
+          (span) => span.textContent === "import",
+        );
+      const darkColor = getComputedStyle(importToken()).color;
+      check(
+        darkColor !==
+          getComputedStyle(document.querySelector(".cm-content")).color,
+        "MDX import uses syntax color",
+      );
+      await menu("Dark Theme");
+      await wait(100);
+      const currentColor = getComputedStyle(importToken()).color;
+      await menu("Light Theme");
+      check(
+        getComputedStyle(importToken()).color !== currentColor,
+        "MDX syntax colors follow theme changes",
+      );
+      check(
+        window.__mideView.state.languageDataAt("autocomplete", 0).length ===
+          0 && !document.querySelector(".cm-tooltip-autocomplete"),
+        "MDX adds no completion or suggestion UI",
+      );
+      document
+        .querySelector('[aria-label="Close sample-mdx-test.mdx"]')
+        .click();
+      await wait(100);
+    } finally {
+      await invoke("delete_entry", { path: "sample-mdx-test.mdx" });
+    }
     await invoke("smoke_report", { success: true, report: results.join("\n") });
   } catch (error) {
     await invoke("smoke_report", {
       success: false,
-      report: results.join("\n") + "\nFAIL " + (error.stack || error),
+      report:
+        results.join("\n") +
+        "\nFAIL " +
+        error.message +
+        "\n" +
+        (error.stack || error),
     });
   }
 })();

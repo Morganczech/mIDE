@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "name": "Quiet Blue",
+  "variant": "dark",
+  "colors": {
+    "bg": "#19202b",
+    "surface": "#202938",
+    "raised": "#2a3547",
+    "fg": "#dce5f3",
+    "muted": "#9daec6",
+    "border": "#35435a",
+    "selection": "#3c5275",
+    "active-line": "#222e40",
+    "cursor": "#eef4ff",
+    "focus": "#a9c7fa",
+    "file-icon": "#91b5f0",
+    "file-icon-active": "#c0d7ff",
+    "syntax-keyword": "#c3aff0",
+    "syntax-string": "#b7d4a4",
+    "syntax-number": "#e1bf96",
+    "syntax-comment": "#96a5bb",
+    "syntax-type": "#e0c2a6",
+    "syntax-property": "#a5d1e2",
+    "terminal-blue": "#91b5f0",
+    "terminal-bright-blue": "#c0d7ff"
+  }
+}

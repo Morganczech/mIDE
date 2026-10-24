@@ -1,9 +1,11 @@
 mod filesystem;
 mod fonts;
 mod formatter;
+mod search;
 #[cfg(feature = "smoke-test")]
 mod smoke;
 mod terminal;
+mod themes;
 
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -19,6 +21,8 @@ pub fn run() {
     #[cfg(not(feature = "smoke-test"))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         fonts::list_system_fonts,
+        themes::import_theme,
+        search::search_project,
         filesystem::open_project,
         filesystem::list_directory,
         filesystem::read_file,
@@ -38,6 +42,8 @@ pub fn run() {
     let builder = builder
         .invoke_handler(tauri::generate_handler![
             fonts::list_system_fonts,
+            themes::import_theme,
+            search::search_project,
             filesystem::open_project,
             filesystem::list_directory,
             filesystem::read_file,

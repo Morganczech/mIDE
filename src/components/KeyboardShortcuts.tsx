@@ -7,6 +7,7 @@ const shortcuts = [
   ["Open Folder", `${modifierKey} + O`],
   ["Save", `${modifierKey} + S`],
   ["Find", `${modifierKey} + F`],
+  ["Find in Project", `${modifierKey} + Alt + F`],
   ["Format Document", `${modifierKey} + Shift + F`],
   ["Toggle Terminal", `${modifierKey} + J`],
   ["Close Tab", `${modifierKey} + W`],

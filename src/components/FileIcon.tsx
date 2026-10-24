@@ -24,6 +24,7 @@ const icons: Record<string, string> = {
   astro,
   json,
   md: markdown,
+  mdx: markdown,
   markdown,
 };
 

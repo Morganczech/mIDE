@@ -1,0 +1,33 @@
+---
+title: Hello MDX
+draft: false
+---
+
+import Card from './Card.astro'
+
+export const items = [{ name: 'One' }, { name: 'Two' }]
+
+# Hello {items.length}
+
+Some **bold**, *italic*, `inline code` and a [link](https://example.com).
+
+- First item
+- Second item
+
+> A quote.
+
+<Card title="Hello" count={2}>
+  Nested **Markdown** and {items[0].name}
+</Card>
+
+{items.map((item) => <Card key={item.name} {...item} />)}
+
+<>A fragment with <em>inline JSX</em>.</>
+
+```js
+const count = 42;
+```
+
+```css
+main { color: red; }
+```

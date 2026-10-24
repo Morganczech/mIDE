@@ -14,7 +14,7 @@ Create `/tmp/mide-smoke-project/index.astro` containing valid Astro with the wor
 
 ```sh
 VITE_NATIVE_SMOKE=1 npm run tauri build -- --no-bundle --debug --features smoke-test
-MIDE_SMOKE_PROJECT=/tmp/mide-smoke-project src-tauri/target/debug/mide
+MIDE_SMOKE_PROJECT=/tmp/mide-smoke-project MIDE_SMOKE_THEME=/tmp/mide-smoke-project/smoke-theme.json src-tauri/target/debug/mide
 cat /tmp/mide-native-report.txt
 ```
 
@@ -29,3 +29,11 @@ On Linux/Wayland, macOS and Windows, verify the native folder picker, mouse and 
 Linux frontend and native builds, unit/integration tests, Clippy and an injected native UI smoke pass (including format undo, filesystem CRUD, terminal Unicode output and Ctrl+C) were run during implementation. Visual inspection covered the empty state and the editor with Light theme and terminal. macOS and Windows are represented in CI configuration but were not run locally. Native IME/clipboard behavior on all three systems still requires hands-on validation.
 
 File icons: native WebKit smoke verifies Astro silhouettes in Explorer and tabs and theme-dependent monochrome color. Selected Devicon SVGs are bundled, with license distributed under licenses/devicon.txt.
+
+Theme imports: native smoke reads a real UTF-8 JSON fixture via Rust (only the chooser is bypassed by a smoke-only environment variable), verifies application/terminal colors, persistence, invalid JSON preservation and removal. Parser tests also cover sparse themes, unsafe colors, unsupported fields/versions, size limits and damaged persisted data.
+
+About: native smoke checks version/author/purpose, source address and full MIT license, ignores application shortcuts while modal, and verifies Escape and Close restore editing without changing the document.
+
+Search: Rust tests verify Unicode UTF-16 columns, literal case-insensitive matching, result limits, unsaved overlays, skipped binaries/dependencies and symlinks. Native smoke checks live document counts (including zero and edits), project shortcut/menu, cross-file count, unsaved content and exact selected match navigation.
+
+MDX: a mixed fixture covers frontmatter, ESM, expressions, nested JSX/components/fragments, Markdown markup and web code fences. Tests check syntax tokens, edits/unfinished JSX and absence of completion data. Native smoke checks lazy loading in WebKitGTK, actual colored tokens, theme changes and the file icon.

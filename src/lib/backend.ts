@@ -19,7 +19,22 @@ export interface SystemFont {
   name: string;
   monospace: boolean;
 }
+export interface ProjectMatch {
+  path: string;
+  line: number;
+  column: number;
+  length: number;
+  preview: string;
+}
+export interface ProjectSearchResults {
+  matches: ProjectMatch[];
+  truncated: boolean;
+  skipped: number;
+}
 export const backend = {
+  search: (query: string, buffers: { path: string; text: string }[]) =>
+    invoke<ProjectSearchResults>("search_project", { query, buffers }),
+  importTheme: () => invoke<string | null>("import_theme"),
   fonts: () => invoke<SystemFont[]>("list_system_fonts"),
   terminalRunning: () => invoke<boolean>("terminal_running"),
   format: (path: string, text: string) =>

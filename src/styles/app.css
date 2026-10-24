@@ -831,3 +831,138 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.custom-themes {
+  margin-top: 16px;
+}
+.custom-theme-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+.theme-swatch {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 24px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.about-dialog {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.about-dialog h2 {
+  margin-bottom: 4px;
+  font-size: 20px;
+}
+.about-version {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 8px;
+}
+.about-subtitle,
+.about-credits {
+  color: var(--muted);
+}
+.about-details {
+  margin: 0 0 20px;
+}
+.about-details > div {
+  display: flex;
+  gap: 16px;
+  margin: 8px 0;
+}
+.about-details dt {
+  width: 52px;
+  flex: none;
+  color: var(--muted);
+}
+.about-details dd {
+  margin: 0;
+}
+.about-repository {
+  display: block;
+  margin-bottom: 8px;
+}
+.about-dialog .about-credits {
+  margin-top: 16px;
+  font-size: 12px;
+}
+.about-license summary {
+  cursor: pointer;
+}
+.about-license pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.find-count {
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: 12px;
+}
+.project-search-dialog {
+  width: min(740px, 92vw);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.project-search-form {
+  display: flex;
+  gap: 8px;
+}
+.project-search-form input {
+  min-width: 0;
+  flex: 1;
+}
+.project-search-form button {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+.search-note,
+.search-summary {
+  color: var(--muted);
+  font-size: 12px;
+}
+.project-search-dialog .search-note {
+  margin: 12px 0;
+}
+.project-search-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.project-search-results button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.search-result-location {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.search-result-preview {
+  display: block;
+  font-family: var(--font-code);
+  color: var(--muted);
+  margin: 5px 0 0 24px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .find-panel {
+    flex-wrap: wrap;
+  }
+}

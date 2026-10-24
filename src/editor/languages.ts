@@ -6,6 +6,12 @@ import { markdown } from "@codemirror/lang-markdown";
 import { astroLanguage } from "@fazelstudio/codemirror-lang-astro";
 import type { Extension } from "@codemirror/state";
 
+let mdx: Extension | undefined;
+export async function prepareLanguage(path: string): Promise<void> {
+  if (path.split(".").pop()?.toLowerCase() === "mdx" && !mdx)
+    mdx = (await import("./mdx")).mdxLanguage;
+}
+
 export function languageFor(path: string): Extension {
   switch (path.split(".").pop()?.toLowerCase()) {
     case "html":
@@ -27,6 +33,8 @@ export function languageFor(path: string): Extension {
       return astroLanguage;
     case "json":
       return json().language;
+    case "mdx":
+      return mdx ?? [];
     case "md":
     case "markdown":
       return markdown().language;

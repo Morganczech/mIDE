@@ -1,3 +1,4 @@
+import { parseTheme, themeId, type CustomTheme } from "../lib/themes";
 import { useEffect, useRef, useState } from "react";
 import { fontStack, normalizeFont } from "../lib/appearance";
 import { backend, errorMessage, type SystemFont } from "../lib/backend";
@@ -75,6 +76,8 @@ function FontPicker({
 export function Settings({
   theme,
   setTheme,
+  customThemes,
+  updateThemes,
   interfaceFont,
   setInterfaceFont,
   editorFont,
@@ -83,8 +86,10 @@ export function Settings({
   setFontSize,
   close,
 }: {
-  theme: "dark" | "light";
-  setTheme: (theme: "dark" | "light") => void;
+  theme: string;
+  setTheme: (theme: string) => void;
+  customThemes: CustomTheme[];
+  updateThemes: (themes: CustomTheme[]) => void;
   interfaceFont: string;
   setInterfaceFont: (value: string) => void;
   editorFont: string;
@@ -93,6 +98,28 @@ export function Settings({
   setFontSize: (value: number) => void;
   close: () => void;
 }) {
+  const [themeError, setThemeError] = useState("");
+  const [importing, setImporting] = useState(false);
+  const importTheme = async () => {
+    setThemeError("");
+    setImporting(true);
+    try {
+      const text = await backend.importTheme();
+      if (text === null) return;
+      const next = parseTheme(text);
+      const themes = customThemes.filter((item) => item.name !== next.name);
+      if (themes.length >= 50)
+        throw new Error(
+          "Remove a theme before importing another (maximum 50).",
+        );
+      updateThemes([...themes, next]);
+      setTheme(themeId(next));
+    } catch (error) {
+      setThemeError(errorMessage(error));
+    } finally {
+      setImporting(false);
+    }
+  };
   const [fonts, setFonts] = useState<SystemFont[]>([]);
   const [fontsLoading, setFontsLoading] = useState(true);
   const [fontsError, setFontsError] = useState("");
@@ -305,6 +332,76 @@ export function Settings({
               </label>
             ))}
           </div>
+          <div
+            className="custom-themes"
+            role="radiogroup"
+            aria-label="Imported themes"
+          >
+            {customThemes.map((item) => (
+              <div className="settings-row" key={item.name}>
+                <label className="custom-theme-label">
+                  <input
+                    type="radio"
+                    name="application-theme"
+                    checked={theme === themeId(item)}
+                    onChange={() => setTheme(themeId(item))}
+                  />
+                  <span
+                    className="theme-swatch"
+                    aria-hidden="true"
+                    style={{
+                      background:
+                        item.colors.bg ??
+                        (item.variant === "dark" ? "#1b1c1e" : "#faf9f6"),
+                      color:
+                        item.colors["file-icon"] ??
+                        (item.variant === "dark" ? "#8daee8" : "#476aa8"),
+                    }}
+                  >
+                    ●
+                  </span>
+                  {item.name}{" "}
+                  <span className="settings-note">
+                    {item.variant === "dark" ? "Dark" : "Light"}
+                  </span>
+                </label>
+                <button
+                  aria-label={`Remove theme ${item.name}`}
+                  onClick={() => {
+                    try {
+                      updateThemes(
+                        customThemes.filter(
+                          (value) => value.name !== item.name,
+                        ),
+                      );
+                      if (theme === themeId(item)) setTheme(item.variant);
+                      setThemeError("");
+                    } catch (error) {
+                      setThemeError(errorMessage(error));
+                    }
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="settings-row">
+            <div>
+              <p>
+                Import a mIDE JSON theme. Matching names replace an existing
+                theme.
+              </p>
+            </div>
+            <button disabled={importing} onClick={importTheme}>
+              {importing ? "Importing…" : "Import Theme…"}
+            </button>
+          </div>
+          {themeError && (
+            <p className="settings-note" role="alert">
+              {themeError}
+            </p>
+          )}
         </section>
         <p className="settings-note">Changes are saved automatically.</p>
       </div>

@@ -1,3 +1,11 @@
+import { ProjectSearch } from "./components/ProjectSearch";
+import { About } from "./components/About";
+import {
+  applyTheme,
+  loadThemes,
+  themeId,
+  type CustomTheme,
+} from "./lib/themes";
 import {
   lazy,
   Suspense,
@@ -9,7 +17,7 @@ import {
 } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isTauri } from "@tauri-apps/api/core";
-import type { EditorView } from "@codemirror/view";
+import { EditorView } from "@codemirror/view";
 import { Explorer, type FileAction } from "./components/Explorer";
 import { Tabs } from "./components/Tabs";
 import { Settings } from "./components/Settings";
@@ -29,6 +37,7 @@ import {
   validName,
   type Entry,
   type Project,
+  type ProjectMatch,
 } from "./lib/backend";
 import {
   openDocument,
@@ -38,7 +47,7 @@ import {
 } from "./lib/documents";
 import { isolateHistory } from "@codemirror/commands";
 import { openSearchPanel } from "@codemirror/search";
-import { languageFor } from "./editor/languages";
+import { languageFor, prepareLanguage } from "./editor/languages";
 
 const Terminal = lazy(() => import("./components/Terminal"));
 
@@ -51,9 +60,18 @@ export default function App() {
   const [version, setVersion] = useState(0);
   const [error, setError] = useState("");
   const [dialog, setDialog] = useState<DialogRequest | null>(null);
-  const [theme, setTheme] = useState<"dark" | "light">(() =>
-    localStorage.getItem("mide-theme") === "light" ? "light" : "dark",
-  );
+  const [customThemes, setCustomThemes] = useState(loadThemes);
+  const [theme, setTheme] = useState(() => {
+    const stored = localStorage.getItem("mide-theme") ?? "dark";
+    return stored === "light" ||
+      customThemes.some((item) => themeId(item) === stored)
+      ? stored
+      : "dark";
+  });
+  const updateThemes = (themes: CustomTheme[]) => {
+    localStorage.setItem("mide-custom-themes", JSON.stringify(themes));
+    setCustomThemes(themes);
+  };
   const [fontSize, setFontSize] = useState(() => {
     const stored = Number(localStorage.getItem("mide-font-size"));
     return Number.isFinite(stored) && stored >= 10 && stored <= 32
@@ -70,6 +88,8 @@ export default function App() {
   const [focus, setFocus] = useState(false);
   const [focusHint, setFocusHint] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [projectSearchOpen, setProjectSearchOpen] = useState(false);
   const [terminalOpen, setTerminalOpen] = useState(false);
   const [terminalCreated, setTerminalCreated] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -164,15 +184,44 @@ export default function App() {
       setProject(next);
       setVersion((v) => v + 1);
     });
-  const openFile = (path: string) =>
+  const openFile = (path: string, match?: ProjectMatch) =>
     run(async () => {
       let doc = documents.current.find((item) => item.path === path);
       if (!doc) {
+        await prepareLanguage(path);
         doc = openDocument(path, await backend.read(path));
         documents.current.push(doc);
       }
+      if (match) {
+        const line = doc.state.doc.line(
+          Math.min(match.line, doc.state.doc.lines),
+        );
+        const from = Math.min(line.to, line.from + match.column - 1);
+        const to = Math.min(line.to, from + match.length);
+        const selection = { anchor: from, head: to };
+        if (activeId === doc.id && view.current)
+          view.current.dispatch({
+            selection,
+            effects: EditorView.scrollIntoView(from, { y: "center" }),
+          });
+        else {
+          doc.state = doc.state.update({ selection }).state;
+          doc.scrollTop = Math.max(0, (match.line - 4) * fontSize * 1.65);
+        }
+      }
       setActiveId(doc.id);
       changed();
+      if (match)
+        requestAnimationFrame(() => {
+          view.current?.focus();
+          if (view.current)
+            view.current.dispatch({
+              effects: EditorView.scrollIntoView(
+                view.current.state.selection.main.from,
+                { y: "center" },
+              ),
+            });
+        });
     });
   const closeTab = (id: number) =>
     run(async () => {
@@ -233,6 +282,7 @@ export default function App() {
           await backend.rename(entry.path, destination);
           for (const doc of affected) {
             doc.path = destination + doc.path.slice(entry.path.length);
+            await prepareLanguage(doc.path);
             const effects = doc.language.reconfigure(languageFor(doc.path));
             if (activeId === doc.id && view.current)
               view.current.dispatch({ effects });
@@ -275,9 +325,9 @@ export default function App() {
       changed();
     });
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    applyTheme(theme, customThemes);
     localStorage.setItem("mide-theme", theme);
-  }, [theme]);
+  }, [theme, customThemes]);
   useEffect(() => {
     requestAnimationFrame(() => {
       view.current?.requestMeasure();
@@ -316,6 +366,17 @@ export default function App() {
       else view.current?.focus();
     });
   };
+  const closeAbout = () => {
+    setAboutOpen(false);
+    requestAnimationFrame(() => {
+      if (settingsOpen) document.getElementById("settings-heading")?.focus();
+      else if (view.current) view.current.focus();
+      else
+        document
+          .querySelector<HTMLButtonElement>(".empty-state button")
+          ?.focus();
+    });
+  };
   useLayoutEffect(() => {
     localStorage.setItem("mide-font-size", String(fontSize));
   }, [fontSize]);
@@ -345,7 +406,7 @@ export default function App() {
   };
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if (event.isComposing || dialog) return;
+      if (event.isComposing || dialog || aboutOpen || projectSearchOpen) return;
       if (event.key === "F1") {
         event.preventDefault();
         event.stopPropagation();
@@ -354,6 +415,21 @@ export default function App() {
         return;
       }
       if (shortcutsOpen) return;
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.altKey &&
+        !event.getModifierState("AltGraph") &&
+        (event.code === "KeyF" || event.key.toLowerCase() === "f") &&
+        !event.shiftKey &&
+        project &&
+        !settingsOpen
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        setMenu(false);
+        setProjectSearchOpen(true);
+        return;
+      }
       if (
         (event.metaKey || event.ctrlKey) &&
         !event.altKey &&
@@ -445,7 +521,16 @@ export default function App() {
     };
     window.addEventListener("keydown", keydown, true);
     return () => window.removeEventListener("keydown", keydown, true);
-  }, [dialog, focus, menu, shortcutsOpen, settingsOpen]);
+  }, [
+    dialog,
+    focus,
+    menu,
+    shortcutsOpen,
+    settingsOpen,
+    aboutOpen,
+    projectSearchOpen,
+    project,
+  ]);
   const closeRequest = useRef(async () => {});
   closeRequest.current = () =>
     run(async () => {
@@ -499,6 +584,8 @@ export default function App() {
           <Settings
             theme={theme}
             setTheme={setTheme}
+            customThemes={customThemes}
+            updateThemes={updateThemes}
             interfaceFont={interfaceFont}
             setInterfaceFont={setInterfaceFont}
             editorFont={editorFont}
@@ -581,6 +668,16 @@ export default function App() {
                   </button>
                   <button
                     role="menuitem"
+                    onClick={() => {
+                      setMenu(false);
+                      setProjectSearchOpen(true);
+                    }}
+                  >
+                    <span>Find in Project</span>
+                    <kbd>{modifierKey} + Alt + F</kbd>
+                  </button>
+                  <button
+                    role="menuitem"
                     disabled={!active}
                     onClick={() => {
                       setMenu(false);
@@ -643,6 +740,15 @@ export default function App() {
                     <span>Keyboard Shortcuts</span>
                     <kbd>F1</kbd>
                   </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setMenu(false);
+                      setAboutOpen(true);
+                    }}
+                  >
+                    About mIDE
+                  </button>
                 </div>
               </>
             )}
@@ -689,6 +795,12 @@ export default function App() {
               >
                 Settings
               </button>
+              <button
+                className="settings-link"
+                onClick={() => setAboutOpen(true)}
+              >
+                About mIDE
+              </button>
             </div>
           </div>
         )}
@@ -697,7 +809,7 @@ export default function App() {
             <Terminal
               key={project.path}
               visible={terminalOpen && !focus && !settingsOpen}
-              theme={theme}
+              theme={theme + JSON.stringify(customThemes)}
               fontFamily={fontStack(editorFont, "editor")}
               hide={() => {
                 setTerminalOpen(false);
@@ -729,6 +841,26 @@ export default function App() {
         </div>
       )}
       {shortcutsOpen && <KeyboardShortcuts close={closeShortcuts} />}
+      {aboutOpen && <About close={closeAbout} />}
+      {projectSearchOpen && project && (
+        <ProjectSearch
+          buffers={() =>
+            documents.current.map((doc) => ({
+              path: doc.path,
+              text: documentText(doc),
+            }))
+          }
+          select={(match) => {
+            setProjectSearchOpen(false);
+            void openFile(match.path, match);
+          }}
+          close={() => {
+            setProjectSearchOpen(false);
+            requestAnimationFrame(() => view.current?.focus());
+          }}
+        />
+      )}
+
       {dialog && (
         <Dialog
           key={dialog.title + dialog.message + dialog.input}

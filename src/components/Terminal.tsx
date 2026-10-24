@@ -20,22 +20,29 @@ function colors() {
     foreground: get("--fg"),
     cursor: get("--cursor"),
     selectionBackground: get("--selection"),
-    black: light ? "#353535" : "#252525",
-    red: light ? "#9f3636" : "#d49393",
-    green: light ? "#486a32" : "#adc496",
-    yellow: light ? "#79601d" : "#cebd8c",
-    blue: light ? "#355e8c" : "#9bb8d2",
-    magenta: light ? "#79528e" : "#bea4ce",
-    cyan: light ? "#296d72" : "#96c1c5",
-    white: light ? "#deded8" : "#d8d8d2",
-    brightBlack: light ? "#656565" : "#8e8e8e",
-    brightRed: light ? "#a83c3c" : "#e0abab",
-    brightGreen: light ? "#4c7432" : "#bfd2ac",
-    brightYellow: light ? "#7b641f" : "#ded0a3",
-    brightBlue: light ? "#3b6492" : "#b1cae1",
-    brightMagenta: light ? "#815895" : "#d0bcde",
-    brightCyan: light ? "#2c7478" : "#acd4d8",
-    brightWhite: light ? "#f9f9f4" : "#f0f0e9",
+    black: get("--terminal-black") || (light ? "#353535" : "#252525"),
+    red: get("--terminal-red") || (light ? "#9f3636" : "#d49393"),
+    green: get("--terminal-green") || (light ? "#486a32" : "#adc496"),
+    yellow: get("--terminal-yellow") || (light ? "#79601d" : "#cebd8c"),
+    blue: get("--terminal-blue") || (light ? "#355e8c" : "#9bb8d2"),
+    magenta: get("--terminal-magenta") || (light ? "#79528e" : "#bea4ce"),
+    cyan: get("--terminal-cyan") || (light ? "#296d72" : "#96c1c5"),
+    white: get("--terminal-white") || (light ? "#deded8" : "#d8d8d2"),
+    brightBlack:
+      get("--terminal-bright-black") || (light ? "#656565" : "#8e8e8e"),
+    brightRed: get("--terminal-bright-red") || (light ? "#a83c3c" : "#e0abab"),
+    brightGreen:
+      get("--terminal-bright-green") || (light ? "#4c7432" : "#bfd2ac"),
+    brightYellow:
+      get("--terminal-bright-yellow") || (light ? "#7b641f" : "#ded0a3"),
+    brightBlue:
+      get("--terminal-bright-blue") || (light ? "#3b6492" : "#b1cae1"),
+    brightMagenta:
+      get("--terminal-bright-magenta") || (light ? "#815895" : "#d0bcde"),
+    brightCyan:
+      get("--terminal-bright-cyan") || (light ? "#2c7478" : "#acd4d8"),
+    brightWhite:
+      get("--terminal-bright-white") || (light ? "#f9f9f4" : "#f0f0e9"),
   };
 }
 type Output =

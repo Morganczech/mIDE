@@ -11,6 +11,14 @@ export default defineConfig({
         codeSplitting: {
           groups: [
             {
+              name: "mdx-grammar-code",
+              test: /node_modules\/@shikijs\/langs\/dist\/(javascript|typescript)\.mjs$/,
+            },
+            {
+              name: "mdx-grammar",
+              test: /node_modules\/@shikijs\/langs\/dist\/(mdx|tsx)\.mjs$/,
+            },
+            {
               name: "react",
               test: /node_modules\/(react|react-dom|scheduler)\//,
             },
