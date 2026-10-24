@@ -17,3 +17,5 @@ Thumbs.db
 .agents/
 .codex/
 .aws/
+.worktrees/
+.superpowers/
