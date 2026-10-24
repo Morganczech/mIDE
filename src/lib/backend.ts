@@ -31,10 +31,18 @@ export interface ProjectSearchResults {
   truncated: boolean;
   skipped: number;
 }
+export interface OmarchyThemeFile {
+  slug: string;
+  name: string;
+  mode: string;
+  colors: Record<string, string>;
+}
 export const backend = {
   search: (query: string, buffers: { path: string; text: string }[]) =>
     invoke<ProjectSearchResults>("search_project", { query, buffers }),
   importTheme: () => invoke<string | null>("import_theme"),
+  readOmarchyTheme: () => invoke<OmarchyThemeFile>("read_omarchy_theme"),
+  watchOmarchyTheme: () => invoke<void>("watch_omarchy_theme"),
   fonts: () => invoke<SystemFont[]>("list_system_fonts"),
   terminalRunning: () => invoke<boolean>("terminal_running"),
   format: (path: string, text: string) =>

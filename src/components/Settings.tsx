@@ -1,4 +1,6 @@
-import { parseTheme, themeId, type CustomTheme } from "../lib/themes";
+import { parseTheme, swatchColors, themeId, type CustomTheme } from "../lib/themes";
+import { builtinThemes } from "../lib/builtin-themes";
+import { filterLibrary, type OmarchyVariant } from "../lib/omarchy-theme";
 import { useEffect, useRef, useState } from "react";
 import { fontStack, normalizeFont } from "../lib/appearance";
 import { backend, errorMessage, type SystemFont } from "../lib/backend";
@@ -78,6 +80,14 @@ export function Settings({
   setTheme,
   customThemes,
   updateThemes,
+  follow,
+  setFollow,
+  omarchyVariant,
+  setOmarchyVariant,
+  omarchyTheme,
+  omarchyName,
+  omarchyError,
+  focusTheme,
   interfaceFont,
   setInterfaceFont,
   editorFont,
@@ -90,6 +100,14 @@ export function Settings({
   setTheme: (theme: string) => void;
   customThemes: CustomTheme[];
   updateThemes: (themes: CustomTheme[]) => void;
+  follow: boolean;
+  setFollow: (value: boolean) => void;
+  omarchyVariant: OmarchyVariant;
+  setOmarchyVariant: (value: OmarchyVariant) => void;
+  omarchyTheme: CustomTheme | null;
+  omarchyName: string;
+  omarchyError: string;
+  focusTheme: boolean;
   interfaceFont: string;
   setInterfaceFont: (value: string) => void;
   editorFont: string;
@@ -144,10 +162,15 @@ export function Settings({
     };
   }, [fontRequest]);
   const heading = useRef<HTMLHeadingElement>(null);
+  const themeHeading = useRef<HTMLHeadingElement>(null);
   const [sizeInput, setSizeInput] = useState(String(fontSize));
+  const [themeQuery, setThemeQuery] = useState("");
+  const [themeFilter, setThemeFilter] = useState<"all" | "dark" | "light">(
+    "all",
+  );
   useEffect(() => {
-    heading.current?.focus();
-  }, []);
+    (focusTheme ? themeHeading : heading).current?.focus();
+  }, [focusTheme]);
   useEffect(() => {
     setSizeInput(String(fontSize));
   }, [fontSize]);
@@ -160,6 +183,48 @@ export function Settings({
     setFontSize(next);
     setSizeInput(String(next));
   };
+  const library = [
+    {
+      id: "dark",
+      name: "Dark",
+      variant: "dark" as const,
+      colors: {},
+      kind: "dark" as const,
+      removable: false,
+    },
+    {
+      id: "light",
+      name: "Light",
+      variant: "light" as const,
+      colors: {},
+      kind: "light" as const,
+      removable: false,
+    },
+    ...builtinThemes.map((item) => ({
+      id: item.id,
+      name: item.theme.name,
+      variant: item.theme.variant,
+      colors: item.theme.colors,
+      kind: "palette" as const,
+      removable: false,
+    })),
+    ...customThemes.map((item) => ({
+      id: themeId(item),
+      name: item.name,
+      variant: item.variant,
+      colors: item.colors,
+      kind: "palette" as const,
+      removable: true,
+    })),
+  ];
+  const visible = filterLibrary(library, themeQuery, themeFilter);
+  const selected = library.find((item) => item.id === theme) ?? library[0];
+  const currentName =
+    follow && omarchyName ? omarchyName : selected.name;
+  const currentDots =
+    follow && omarchyTheme
+      ? swatchColors("palette", omarchyTheme.variant, omarchyTheme.colors)
+      : swatchColors(selected.kind, selected.variant, selected.colors);
   return (
     <section className="settings-page" aria-labelledby="settings-heading">
       <div className="settings-content">
@@ -292,97 +357,139 @@ export function Settings({
           className="settings-section"
           aria-labelledby="theme-settings-title"
         >
-          <h2 id="theme-settings-title">Theme</h2>
+          <h2 id="theme-settings-title" tabIndex={-1} ref={themeHeading}>
+            Theme
+          </h2>
           <p className="settings-description">
             Applies to the editor, interface and terminal.
           </p>
-          <div
-            className="theme-choices"
-            role="radiogroup"
-            aria-label="Application theme"
-          >
-            {(["dark", "light"] as const).map((option) => (
-              <label
-                key={option}
-                className={`theme-choice ${theme === option ? "chosen" : ""}`}
-              >
-                <span
-                  className="theme-preview"
-                  data-variant={option}
-                  aria-hidden="true"
-                >
-                  <span className="theme-preview-sidebar" />
-                  <span className="theme-preview-code">
-                    <span>const</span>
-                    {" title = "}
-                    <span>"Hello"</span>
-                    {";\n\n<main>\n  <h1>{title}</h1>\n</main>"}
-                  </span>
-                </span>
-                <span className="theme-caption">
-                  <span>{option === "dark" ? "Dark" : "Light"}</span>
+          <div className="settings-row">
+            <div>
+              <p className="theme-row-title">Follow Omarchy</p>
+              <p>Use the active Omarchy theme and switch when it changes.</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              className={follow ? "switch on" : "switch"}
+              aria-checked={follow}
+              aria-label="Follow Omarchy"
+              onClick={() => setFollow(!follow)}
+            >
+              <span className="switch-knob" />
+            </button>
+          </div>
+          <div className="settings-row">
+            <div>
+              <label htmlFor="omarchy-variant">Omarchy variant</label>
+              <p>Original palette, darker surfaces, or stronger contrast.</p>
+            </div>
+            <select
+              id="omarchy-variant"
+              value={omarchyVariant}
+              disabled={!follow}
+              onChange={(event) =>
+                setOmarchyVariant(event.target.value as OmarchyVariant)
+              }
+            >
+              <option value="original">Original</option>
+              <option value="darker">Darker</option>
+              <option value="contrast">Contrast</option>
+            </select>
+          </div>
+          <div className="settings-row">
+            <div>
+              <p className="theme-row-title">Current theme</p>
+              <p>{currentName}</p>
+            </div>
+            <span className="theme-dots" aria-hidden="true">
+              {currentDots.map((color, index) => (
+                <span key={index} style={{ background: color }} />
+              ))}
+            </span>
+          </div>
+          <div className="theme-library-bar">
+            <p className="theme-row-title">Theme library</p>
+            <input
+              aria-label="Search themes"
+              placeholder="Search themes"
+              value={themeQuery}
+              onChange={(event) => setThemeQuery(event.target.value)}
+            />
+            <div
+              className="theme-filter"
+              role="radiogroup"
+              aria-label="Theme variant"
+            >
+              {(
+                [
+                  ["all", "All"],
+                  ["light", "Light"],
+                  ["dark", "Dark"],
+                ] as const
+              ).map(([value, label]) => (
+                <label key={value}>
                   <input
                     type="radio"
-                    name="application-theme"
-                    value={option}
-                    checked={theme === option}
-                    onChange={() => setTheme(option)}
+                    name="theme-variant-filter"
+                    checked={themeFilter === value}
+                    onChange={() => setThemeFilter(value)}
                   />
-                </span>
-              </label>
-            ))}
+                  {label}
+                </label>
+              ))}
+            </div>
           </div>
           <div
-            className="custom-themes"
+            className="theme-library"
             role="radiogroup"
-            aria-label="Imported themes"
+            aria-label="Theme library"
           >
-            {customThemes.map((item) => (
-              <div className="settings-row" key={item.name}>
-                <label className="custom-theme-label">
+            {visible.length === 0 && (
+              <p className="settings-note">No matching themes.</p>
+            )}
+            {visible.map((item) => (
+              <div className="settings-row" key={item.id}>
+                <label className="theme-library-label">
                   <input
                     type="radio"
                     name="application-theme"
-                    checked={theme === themeId(item)}
-                    onChange={() => setTheme(themeId(item))}
+                    checked={!follow && theme === item.id}
+                    onChange={() => setTheme(item.id)}
                   />
-                  <span
-                    className="theme-swatch"
-                    aria-hidden="true"
-                    style={{
-                      background:
-                        item.colors.bg ??
-                        (item.variant === "dark" ? "#1b1c1e" : "#faf9f6"),
-                      color:
-                        item.colors["file-icon"] ??
-                        (item.variant === "dark" ? "#8daee8" : "#476aa8"),
-                    }}
-                  >
-                    ●
+                  <span className="theme-dots" aria-hidden="true">
+                    {swatchColors(item.kind, item.variant, item.colors).map(
+                      (color, index) => (
+                        <span key={index} style={{ background: color }} />
+                      ),
+                    )}
                   </span>
-                  {item.name}{" "}
-                  <span className="settings-note">
+                  <span className="theme-library-name">{item.name}</span>
+                  <span className="theme-variant" aria-hidden="true">
                     {item.variant === "dark" ? "Dark" : "Light"}
                   </span>
                 </label>
-                <button
-                  aria-label={`Remove theme ${item.name}`}
-                  onClick={() => {
-                    try {
-                      updateThemes(
-                        customThemes.filter(
-                          (value) => value.name !== item.name,
-                        ),
-                      );
-                      if (theme === themeId(item)) setTheme(item.variant);
-                      setThemeError("");
-                    } catch (error) {
-                      setThemeError(errorMessage(error));
-                    }
-                  }}
-                >
-                  Remove
-                </button>
+                {item.removable && (
+                  <button
+                    type="button"
+                    aria-label={`Remove theme ${item.name}`}
+                    onClick={() => {
+                      try {
+                        updateThemes(
+                          customThemes.filter(
+                            (value) => value.name !== item.name,
+                          ),
+                        );
+                        if (theme === item.id) setTheme(item.variant);
+                        setThemeError("");
+                      } catch (error) {
+                        setThemeError(errorMessage(error));
+                      }
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -397,6 +504,11 @@ export function Settings({
               {importing ? "Importing…" : "Import Theme…"}
             </button>
           </div>
+          {omarchyError && (
+            <p className="settings-note" role="alert">
+              {omarchyError}
+            </p>
+          )}
           {themeError && (
             <p className="settings-note" role="alert">
               {themeError}

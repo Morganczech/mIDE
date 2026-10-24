@@ -1,6 +1,7 @@
 mod filesystem;
 mod fonts;
 mod formatter;
+mod omarchy;
 mod search;
 #[cfg(feature = "smoke-test")]
 mod smoke;
@@ -22,6 +23,8 @@ pub fn run() {
     let builder = builder.invoke_handler(tauri::generate_handler![
         fonts::list_system_fonts,
         themes::import_theme,
+        omarchy::read_omarchy_theme,
+        omarchy::watch_omarchy_theme,
         search::search_project,
         filesystem::open_project,
         filesystem::list_directory,
@@ -43,6 +46,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             fonts::list_system_fonts,
             themes::import_theme,
+            omarchy::read_omarchy_theme,
+            omarchy::watch_omarchy_theme,
             search::search_project,
             filesystem::open_project,
             filesystem::list_directory,

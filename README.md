@@ -95,7 +95,9 @@ mIDE is released under the [MIT License](LICENSE). Third-party dependencies reta
 
 ## Importing themes
 
-Open **Settings → Theme → Import Theme…** and select a UTF-8 JSON file. Try [themes/quiet-blue.json](themes/quiet-blue.json). A valid theme is applied immediately and saved locally with your preferences; the original file is not required afterward. Importing the same name replaces that theme. **Remove** deletes an imported theme; removing the selected theme returns to its Dark/Light base. Dark and Light remain built in.
+Dark, Light, Dracula, One Dark, Nord, Monokai, Material Ocean, One Light, GitHub Light, Solarized Light and Material Lighter are built in. Open **Settings → Theme** and choose one from the library. Search and the All / Light / Dark filter narrow the list. **Follow Omarchy** maps the active Omarchy palette onto the editor and updates when that desktop theme changes. Original, Darker and Contrast change only that mapped palette.
+
+**Import Theme…** adds another UTF-8 JSON file. Try [themes/quiet-blue.json](themes/quiet-blue.json). A valid theme is applied immediately and saved locally with your preferences; the original file is not required afterward. Importing the same name replaces that imported theme. **Remove** deletes an imported theme; removing the selected theme returns to its Dark or Light base. Built-in themes stay in the library.
 
 The mIDE format is intentionally small and is not a VS Code or TextMate theme format:
 

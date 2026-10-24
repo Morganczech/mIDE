@@ -1,11 +1,17 @@
 import { ProjectSearch } from "./components/ProjectSearch";
 import { About } from "./components/About";
 import {
+  applyPalette,
   applyTheme,
   loadThemes,
   themeId,
   type CustomTheme,
 } from "./lib/themes";
+import { builtinThemes, themeLabel } from "./lib/builtin-themes";
+import {
+  mapOmarchyTheme,
+  type OmarchyVariant,
+} from "./lib/omarchy-theme";
 import {
   lazy,
   Suspense,
@@ -17,6 +23,7 @@ import {
 } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { EditorView } from "@codemirror/view";
 import { Explorer, type FileAction } from "./components/Explorer";
 import { Tabs } from "./components/Tabs";
@@ -63,11 +70,38 @@ export default function App() {
   const [customThemes, setCustomThemes] = useState(loadThemes);
   const [theme, setTheme] = useState(() => {
     const stored = localStorage.getItem("mide-theme") ?? "dark";
-    return stored === "light" ||
-      customThemes.some((item) => themeId(item) === stored)
+    return stored === "dark" ||
+      stored === "light" ||
+      customThemes.some((item) => themeId(item) === stored) ||
+      builtinThemes.some((item) => item.id === stored)
       ? stored
       : "dark";
   });
+  const [follow, setFollowOn] = useState(
+    () => localStorage.getItem("mide-follow-omarchy") === "1",
+  );
+  const [omarchyVariant, setOmarchyVariant] = useState<OmarchyVariant>(() => {
+    const stored = localStorage.getItem("mide-omarchy-variant");
+    return stored === "darker" || stored === "contrast" ? stored : "original";
+  });
+  const [omarchyTheme, setOmarchyTheme] = useState<CustomTheme | null>(null);
+  const [omarchyName, setOmarchyName] = useState("");
+  const [omarchyError, setOmarchyError] = useState("");
+  const [focusTheme, setFocusTheme] = useState(false);
+  const omarchyGeneration = useRef(0);
+  const chooseTheme = (id: string) => {
+    setFollowOn(false);
+    setOmarchyError("");
+    setTheme(id);
+  };
+  const setFollow = (on: boolean) => {
+    setOmarchyError("");
+    if (on) {
+      setOmarchyTheme(null);
+      setOmarchyName("");
+    }
+    setFollowOn(on);
+  };
   const updateThemes = (themes: CustomTheme[]) => {
     localStorage.setItem("mide-custom-themes", JSON.stringify(themes));
     setCustomThemes(themes);
@@ -325,9 +359,76 @@ export default function App() {
       changed();
     });
   useLayoutEffect(() => {
-    applyTheme(theme, customThemes);
-    localStorage.setItem("mide-theme", theme);
-  }, [theme, customThemes]);
+    if (follow && omarchyTheme) applyPalette(omarchyTheme);
+    else
+      applyTheme(
+        theme,
+        customThemes,
+        document.documentElement,
+        builtinThemes,
+      );
+    if (!follow) localStorage.setItem("mide-theme", theme);
+  }, [follow, omarchyTheme, theme, customThemes]);
+  useEffect(() => {
+    if (follow) localStorage.setItem("mide-follow-omarchy", "1");
+    else localStorage.removeItem("mide-follow-omarchy");
+  }, [follow]);
+  useEffect(() => {
+    localStorage.setItem("mide-omarchy-variant", omarchyVariant);
+  }, [omarchyVariant]);
+  useEffect(() => {
+    if (!follow) return;
+    const generation = ++omarchyGeneration.current;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    const current = () => !disposed && generation === omarchyGeneration.current;
+    const load = async () => {
+      if (!isTauri()) {
+        if (current()) setOmarchyError("Omarchy theme is unavailable.");
+        return;
+      }
+      try {
+        const raw = await backend.readOmarchyTheme();
+        if (!current()) return;
+        if (raw.mode !== "dark" && raw.mode !== "light")
+          throw new Error("Omarchy theme file is invalid.");
+        setOmarchyTheme(
+          mapOmarchyTheme(
+            { name: raw.name, mode: raw.mode, colors: raw.colors },
+            omarchyVariant,
+          ),
+        );
+        setOmarchyName(raw.name);
+        setOmarchyError("");
+      } catch (error) {
+        if (!current()) return;
+        const message = errorMessage(error);
+        setOmarchyError(
+          message === "Omarchy theme file is invalid."
+            ? message
+            : "Omarchy theme is unavailable.",
+        );
+      }
+    };
+    void (async () => {
+      await load();
+      if (!current() || !isTauri()) return;
+      try {
+        await backend.watchOmarchyTheme();
+        const stop = await listen("omarchy-theme-changed", () => {
+          void load();
+        });
+        if (!current()) stop();
+        else unlisten = stop;
+      } catch {
+        // A failed read already explains a missing Omarchy theme.
+      }
+    })();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [follow, omarchyVariant]);
   useEffect(() => {
     requestAnimationFrame(() => {
       view.current?.requestMeasure();
@@ -583,9 +684,17 @@ export default function App() {
         {settingsOpen && (
           <Settings
             theme={theme}
-            setTheme={setTheme}
+            setTheme={chooseTheme}
             customThemes={customThemes}
             updateThemes={updateThemes}
+            follow={follow}
+            setFollow={setFollow}
+            omarchyVariant={omarchyVariant}
+            setOmarchyVariant={setOmarchyVariant}
+            omarchyTheme={omarchyTheme}
+            omarchyName={omarchyName}
+            omarchyError={omarchyError}
+            focusTheme={focusTheme}
             interfaceFont={interfaceFont}
             setInterfaceFont={setInterfaceFont}
             editorFont={editorFont}
@@ -702,12 +811,16 @@ export default function App() {
                     role="menuitem"
                     onClick={() => {
                       setMenu(false);
-                      setTheme((value) =>
-                        value === "dark" ? "light" : "dark",
-                      );
+                      setFocusTheme(true);
+                      setSettingsOpen(true);
                     }}
                   >
-                    {theme === "dark" ? "Light Theme" : "Dark Theme"}
+                    <span>
+                      Theme:{" "}
+                      {follow && omarchyName
+                        ? omarchyName
+                        : themeLabel(theme, customThemes, themeId)}
+                    </span>
                   </button>
                   <button
                     role="menuitem"
@@ -723,6 +836,7 @@ export default function App() {
                     role="menuitem"
                     onClick={() => {
                       setMenu(false);
+                      setFocusTheme(false);
                       setSettingsOpen(true);
                     }}
                   >

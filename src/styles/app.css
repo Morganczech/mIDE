@@ -708,73 +708,129 @@ kbd {
 .preview-string {
   color: var(--syntax-string);
 }
-.theme-choices {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+.theme-row-title {
+  font-weight: 550;
+  margin: 0;
 }
-.theme-choice {
+.settings-row .theme-row-title {
+  margin: 0;
+}
+.theme-variant {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+.theme-library-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.theme-library-bar .theme-row-title {
+  flex: none;
+  margin-right: 8px;
+}
+.theme-library-bar input {
+  flex: 1;
+  min-width: 140px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--fg);
+}
+.theme-filter {
+  display: flex;
+  flex: none;
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
+}
+.theme-filter label {
+  position: relative;
+  padding: 8px 10px;
   cursor: pointer;
 }
-.theme-choice.chosen {
-  border-color: var(--focus);
+.theme-filter input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
 }
-.theme-choice:focus-within {
+.theme-filter label:has(input:checked) {
+  background: var(--raised);
+}
+.theme-filter label:has(input:focus-visible) {
   outline: 1px solid var(--focus);
-  outline-offset: 3px;
+  outline-offset: -2px;
 }
-.theme-preview {
-  display: flex;
-  height: 132px;
-  font-family: var(--font-code);
-  font-size: 12px;
-  line-height: 1.6;
-  background: #1b1c1e;
-  color: #dededc;
+.theme-library .settings-row {
+  padding: 10px 0;
 }
-.theme-preview-sidebar {
-  width: 36px;
-  flex: none;
-  border-right: 1px solid #35373b;
-  background: #202124;
-}
-.theme-preview-code {
-  white-space: pre;
-  padding: 14px;
-  overflow: hidden;
-}
-.theme-preview-code > span:first-child {
-  color: #b7a6d5;
-}
-.theme-preview-code > span:last-child {
-  color: #b3c69e;
-}
-.theme-preview[data-variant="light"] {
-  background: #faf9f6;
-  color: #292b2e;
-}
-.theme-preview[data-variant="light"] .theme-preview-sidebar {
-  background: #f0efeb;
-  border-color: #d2d1cc;
-}
-.theme-preview[data-variant="light"] .theme-preview-code > span:first-child {
-  color: #70568c;
-}
-.theme-preview[data-variant="light"] .theme-preview-code > span:last-child {
-  color: #4d682f;
-}
-.theme-caption {
+.theme-library-label {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px;
+  gap: 10px;
+  min-width: 0;
 }
-.theme-caption input {
-  margin: 0;
-  accent-color: var(--muted);
+.theme-library-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.theme-dots {
+  display: inline-flex;
+  gap: 4px;
+  flex: none;
+}
+.theme-dots span {
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+}
+.switch {
+  width: 36px;
+  height: 20px;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+.switch:hover {
+  background: var(--bg);
+}
+.switch.on {
+  background: var(--raised);
+}
+.switch.on:hover {
+  background: var(--raised);
+}
+.switch-knob {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.switch.on .switch-knob {
+  margin-left: auto;
+  background: var(--fg);
+}
+select:disabled {
+  opacity: 0.55;
+}
+.settings-row select {
+  width: 160px;
+  flex: none;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
 }
 @media (max-width: 640px) {
   .settings-page {
@@ -832,23 +888,8 @@ kbd {
   text-overflow: ellipsis;
 }
 
-.custom-themes {
-  margin-top: 16px;
-}
-.custom-theme-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  overflow-wrap: anywhere;
-}
-.theme-swatch {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 24px;
-  flex: none;
-  border: 1px solid var(--border);
-  border-radius: 3px;
+.theme-library {
+  margin-top: 0;
 }
 
 .about-dialog {
