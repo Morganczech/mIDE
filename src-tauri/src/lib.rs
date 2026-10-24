@@ -1,3 +1,4 @@
+mod live_server;
 mod filesystem;
 mod fonts;
 mod formatter;
