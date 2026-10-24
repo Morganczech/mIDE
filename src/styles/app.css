@@ -370,7 +370,7 @@ dialog input {
   --fg: #292b2e;
   --muted: #64666b;
   --border: #d2d1cc;
-  --selection: #cbd9e9;
+  --selection: #a1b3c8;
   --active-line: #efeee9;
   --cursor: #22252a;
   --focus: #405c7c;
@@ -855,11 +855,23 @@ select:disabled {
   padding: 2px 6px;
 }
 
-.cm-editor .cm-activeLine,
-.cm-editor .cm-activeLineGutter {
-  background: var(--active-line) !important;
+.cm-editor .cm-activeLine {
+  position: relative;
+  background: transparent !important;
+}
+/* The selection layer sits at a small negative z-index, behind the
+   text. An opaque line background covers it, so the highlight is a
+   separate layer further back. */
+.cm-editor .cm-activeLine::before {
+  content: "";
+  position: absolute;
+  z-index: -10;
+  inset: 0;
+  background: var(--active-line);
+  pointer-events: none;
 }
 .cm-editor .cm-activeLineGutter {
+  background: var(--active-line) !important;
   color: var(--fg);
 }
 
