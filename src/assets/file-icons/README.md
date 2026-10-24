@@ -1,0 +1,1 @@
+Selected plain SVG icons from Devicon v2.17.0 (https://github.com/devicons/devicon/tree/v2.17.0/icons). Rendered as monochrome CSS masks. MIT license in LICENSE; brand marks belong to their respective owners.
