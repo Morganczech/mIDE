@@ -22,6 +22,7 @@ import {
   insertNewlineAndIndent,
 } from "@codemirror/commands";
 import { tags } from "@lezer/highlight";
+import { cssColorPicker } from "./css-colors";
 import { findExtensions } from "./find";
 import { languageFor } from "./languages";
 
@@ -69,6 +70,7 @@ export function createEditorState(
       indentUnit.of("  "),
       syntaxHighlighting(syntaxStyle),
       language.of(languageFor(path)),
+      cssColorPicker,
       keymap.of([
         { key: "Enter", run: insertNewlineAndIndent },
         indentWithTab,
