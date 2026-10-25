@@ -576,26 +576,33 @@ pub fn live_server_open(live: State<'_, LiveState>) -> Result<()> {
     live.open()
 }
 
-fn write_tree(root: &Path) {
-    fs::create_dir_all(root.join("css")).unwrap();
-    fs::write(root.join("index.html"), "<html><body>Hi</body></html>").unwrap();
-    fs::write(root.join("css/app.css"), "body{color:red}").unwrap();
-    fs::write(root.join("app.js"), "console.log(1)").unwrap();
-    fs::write(root.join("plain.txt"), "hello").unwrap();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn temp() -> PathBuf {
+    fn scratch(prefix: &str) -> PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static NEXT: AtomicU64 = AtomicU64::new(0);
         let path = std::env::temp_dir().join(format!(
-            "mide-live-{}",
-            std::process::id()
+            "{prefix}-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed),
         ));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    fn temp() -> PathBuf {
+        scratch("mide-live")
+    }
+
+    fn write_tree(root: &Path) {
+        fs::create_dir_all(root.join("css")).unwrap();
+        fs::write(root.join("index.html"), "<html><body>Hi</body></html>").unwrap();
+        fs::write(root.join("css/app.css"), "body{color:red}").unwrap();
+        fs::write(root.join("app.js"), "console.log(1)").unwrap();
+        fs::write(root.join("plain.txt"), "hello").unwrap();
     }
 
     #[test]
@@ -714,9 +721,7 @@ mod tests {
     #[test]
     fn index_html_symlink_outside_project_is_not_served() {
         let root = temp();
-        let outside = std::env::temp_dir().join(format!("mide-outside-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&outside);
-        fs::create_dir_all(&outside).unwrap();
+        let outside = scratch("mide-outside");
         fs::write(outside.join("secret.html"), "<html>secret</html>").unwrap();
         std::os::unix::fs::symlink(outside.join("secret.html"), root.join("index.html")).unwrap();
         fs::create_dir_all(root.join("docs")).unwrap();
