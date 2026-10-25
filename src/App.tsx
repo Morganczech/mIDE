@@ -132,9 +132,14 @@ export default function App() {
   const busyRef = useRef(false);
   const [live, setLive] = useState<{ port: number; url: string } | null>(null);
   const [liveMessage, setLiveMessage] = useState("");
-  const liveRef = useRef(live);
+  const liveRef = useRef<{ port: number; url: string } | null>(null);
   const liveBusy = useRef(false);
-  liveRef.current = live;
+  const liveTask = useRef<Promise<void> | null>(null);
+  const liveSwitching = useRef(false);
+  const setLiveNow = (next: { port: number; url: string } | null) => {
+    liveRef.current = next;
+    setLive(next);
+  };
   const view = useRef<EditorView | null>(null);
   const active = documents.current.find((doc) => doc.id === activeId);
   const currentActions = useRef({
@@ -217,10 +222,19 @@ export default function App() {
         return;
       const next = await backend.openProject();
       if (!next) return;
-      if (liveRef.current) {
-        await backend.liveServerStop();
-        setLive(null);
-        setLiveMessage(LIVE_STOPPED);
+      const pendingLive = liveTask.current;
+      liveSwitching.current = true;
+      liveBusy.current = true;
+      try {
+        await pendingLive;
+        if (liveRef.current) {
+          await backend.liveServerStop();
+          setLiveNow(null);
+          setLiveMessage(LIVE_STOPPED);
+        }
+      } finally {
+        liveSwitching.current = false;
+        liveBusy.current = false;
       }
       documents.current = [];
       setTerminalCreated(false);
@@ -229,26 +243,37 @@ export default function App() {
       setProject(next);
       setVersion((v) => v + 1);
     });
-  const toggleLive = async () => {
+  const toggleLive = () => {
     if (liveBusy.current) return;
     liveBusy.current = true;
-    try {
-      if (liveRef.current) {
-        await backend.liveServerStop();
-        setLive(null);
-        setLiveMessage(LIVE_STOPPED);
-      } else {
-        const info = await backend.liveServerStart();
-        const status = startedStatus(info);
-        setLive({ port: info.port, url: info.url });
-        setLiveMessage(status.message);
-        setError(status.error);
+    const task = (async () => {
+      try {
+        if (liveRef.current) {
+          await backend.liveServerStop();
+          setLiveNow(null);
+          setLiveMessage(LIVE_STOPPED);
+        } else {
+          const info = await backend.liveServerStart();
+          if (liveSwitching.current) {
+            liveRef.current = { port: info.port, url: info.url };
+            await backend.liveServerStop();
+            return;
+          }
+          const status = startedStatus(info);
+          setLiveNow({ port: info.port, url: info.url });
+          setLiveMessage(status.message);
+          setError(status.error);
+        }
+      } catch (caught) {
+        setError(errorMessage(caught));
+      } finally {
+        if (!liveSwitching.current) liveBusy.current = false;
       }
-    } catch (caught) {
-      setError(errorMessage(caught));
-    } finally {
-      liveBusy.current = false;
-    }
+    })();
+    liveTask.current = task;
+    void task.finally(() => {
+      if (liveTask.current === task) liveTask.current = null;
+    });
   };
   const openFile = (path: string, match?: ProjectMatch) =>
     run(async () => {
