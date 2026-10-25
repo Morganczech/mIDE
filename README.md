@@ -4,7 +4,7 @@
 
 It provides the essentials for editing HTML, CSS, JavaScript, TypeScript, React and Astro. It deliberately leaves out code suggestions, automatic completion, auto-closing tags and brackets, AI assistants and language servers. The goal is to give learners a comfortable place to practice writing and understanding their own code.
 
-Designed for Linux, macOS and Windows. The current version is **0.1.0**; Linux is the primary development and verification platform.
+Designed for Linux, macOS and Windows. The current version is **0.2.0**; Linux is the primary development and verification platform.
 
 Tauri 2 · Rust · React · TypeScript · Vite · CodeMirror 6
 
