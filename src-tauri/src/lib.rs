@@ -1,7 +1,7 @@
-mod live_server;
 mod filesystem;
 mod fonts;
 mod formatter;
+mod live_server;
 mod omarchy;
 mod search;
 #[cfg(feature = "smoke-test")]

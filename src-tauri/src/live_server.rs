@@ -83,7 +83,10 @@ fn relative_target(target: &str) -> Option<PathBuf> {
     }
     let trimmed = decoded.trim_start_matches('/');
     let relative = PathBuf::from(trimmed);
-    if relative.components().any(|component| !matches!(component, Component::Normal(_) | Component::CurDir)) {
+    if relative
+        .components()
+        .any(|component| !matches!(component, Component::Normal(_) | Component::CurDir))
+    {
         return None;
     }
     Some(relative)
@@ -177,7 +180,10 @@ fn redirect_location(relative: &Path) -> String {
     location
 }
 
-fn directory_index_reply(root: &Path, dir: &Path) -> std::result::Result<Option<LiveReply>, LiveReply> {
+fn directory_index_reply(
+    root: &Path,
+    dir: &Path,
+) -> std::result::Result<Option<LiveReply>, LiveReply> {
     let index = dir.join("index.html");
     if index.symlink_metadata().is_err() {
         return Ok(None);
@@ -313,7 +319,10 @@ fn read_request(stream: &mut TcpStream) -> std::io::Result<(String, String)> {
     let method = parts.next().unwrap_or("").to_string();
     let target = parts.next().unwrap_or("/").to_string();
     if method.is_empty() {
-        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "request"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "request",
+        ));
     }
     Ok((method, target))
 }
@@ -331,7 +340,11 @@ fn write_reply(stream: &mut TcpStream, reply: &LiveReply) -> std::io::Result<()>
     if let Some(location) = &reply.location {
         write!(stream, "Location: {location}\r\n")?;
     }
-    write!(stream, "Content-Length: {}\r\nConnection: close\r\n\r\n", reply.body.len())?;
+    write!(
+        stream,
+        "Content-Length: {}\r\nConnection: close\r\n\r\n",
+        reply.body.len()
+    )?;
     stream.write_all(&reply.body)
 }
 
@@ -422,10 +435,15 @@ pub fn start_watch(root: &Path, events: Sender<()>) -> notify::Result<Recommende
         let Ok(event) = result else {
             return;
         };
-        if matches!(event.kind, EventKind::Access(_)) || started.elapsed() < Duration::from_millis(300) {
+        if matches!(event.kind, EventKind::Access(_))
+            || started.elapsed() < Duration::from_millis(300)
+        {
             return;
         }
-        if matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)) {
+        if matches!(
+            event.kind,
+            EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+        ) {
             let _ = events.send(());
         }
     })?;
@@ -485,9 +503,8 @@ impl LiveState {
             return Ok(info(port, None, None));
         }
         let ports: Vec<u16> = LIVE_PORTS.collect();
-        let (listener, port) = bind_first(&ports).map_err(|_| {
-            AppError::new("LIVE_SERVER", "Live Server could not find a free port.")
-        })?;
+        let (listener, port) = bind_first(&ports)
+            .map_err(|_| AppError::new("LIVE_SERVER", "Live Server could not find a free port."))?;
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
         let (reload_tx, reload_rx) = mpsc::channel();
         let (watch_tx, watch_rx) = mpsc::channel();
@@ -508,7 +525,10 @@ impl LiveState {
                 });
                 (Some(watcher), None)
             }
-            Err(_) => (None, Some("Live Server cannot watch files for reload.".to_string())),
+            Err(_) => (
+                None,
+                Some("Live Server cannot watch files for reload.".to_string()),
+            ),
         };
         let served = root.clone();
         let thread = thread::spawn(move || serve(listener, served, shutdown_rx, reload_rx));
@@ -543,7 +563,10 @@ impl LiveState {
             .ok_or_else(|| AppError::new("LIVE_SERVER", "Live Server is not running."))?;
         let url = format!("http://127.0.0.1:{port}/");
         open_browser(&url).map_err(|_| {
-            AppError::new("LIVE_SERVER", format!("Could not open the browser. Open {url}"))
+            AppError::new(
+                "LIVE_SERVER",
+                format!("Could not open the browser. Open {url}"),
+            )
         })
     }
 }
@@ -613,7 +636,9 @@ mod tests {
         let text = String::from_utf8(reply.body).unwrap();
         assert_eq!(reply.status, 200);
         assert!(text.contains("Hi"));
-        assert!(text.find("EventSource").unwrap() < text.to_ascii_lowercase().rfind("</body>").unwrap());
+        assert!(
+            text.find("EventSource").unwrap() < text.to_ascii_lowercase().rfind("</body>").unwrap()
+        );
         let _ = fs::remove_dir_all(root);
     }
 
@@ -667,7 +692,12 @@ mod tests {
         let root = temp();
         write_tree(&root);
         std::os::unix::fs::symlink(std::env::temp_dir(), root.join("outside")).unwrap();
-        for target in ["/../secret", "/css/../../etc/passwd", "/css\\app.css", "/outside/secret"] {
+        for target in [
+            "/../secret",
+            "/css/../../etc/passwd",
+            "/css\\app.css",
+            "/outside/secret",
+        ] {
             let reply = respond(&root, "GET", target);
             assert_eq!(reply.status, 404, "{target}");
             assert_eq!(reply.body, b"Not found");
@@ -704,11 +734,16 @@ mod tests {
         assert_eq!(css.body, b"body{color:red}");
         let js = respond(&root, "GET", "/app.js");
         assert_eq!(js.content_type, "text/javascript; charset=utf-8");
-        assert!(!String::from_utf8(js.body.clone()).unwrap().contains("EventSource"));
+        assert!(!String::from_utf8(js.body.clone())
+            .unwrap()
+            .contains("EventSource"));
         let plain = respond(&root, "GET", "/plain.txt");
         assert_eq!(plain.content_type, "text/plain; charset=utf-8");
         fs::write(root.join("pic.webp"), [1, 2, 3]).unwrap();
-        assert_eq!(respond(&root, "GET", "/pic.webp").content_type, "image/webp");
+        assert_eq!(
+            respond(&root, "GET", "/pic.webp").content_type,
+            "image/webp"
+        );
         fs::write(root.join("blob.bin"), [0]).unwrap();
         assert_eq!(
             respond(&root, "GET", "/blob.bin").content_type,
@@ -725,7 +760,8 @@ mod tests {
         fs::write(outside.join("secret.html"), "<html>secret</html>").unwrap();
         std::os::unix::fs::symlink(outside.join("secret.html"), root.join("index.html")).unwrap();
         fs::create_dir_all(root.join("docs")).unwrap();
-        std::os::unix::fs::symlink(outside.join("secret.html"), root.join("docs/index.html")).unwrap();
+        std::os::unix::fs::symlink(outside.join("secret.html"), root.join("docs/index.html"))
+            .unwrap();
         for target in ["/", "/docs/"] {
             let reply = respond(&root, "GET", target);
             assert_eq!(reply.status, 404, "{target}");
@@ -808,13 +844,18 @@ mod tests {
         let served = root.clone();
         let thread = std::thread::spawn(move || serve(listener, served, shutdown_rx, reload_rx));
         let mut page = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
-        page.write_all(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n").unwrap();
+        page.write_all(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+            .unwrap();
         let mut buffer = Vec::new();
         page.read_to_end(&mut buffer).unwrap();
         assert!(String::from_utf8_lossy(&buffer).contains("EventSource"));
         let mut events = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
-        events.write_all(b"GET /__mide/live HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n").unwrap();
-        events.set_read_timeout(Some(Duration::from_millis(200))).unwrap();
+        events
+            .write_all(b"GET /__mide/live HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+            .unwrap();
+        events
+            .set_read_timeout(Some(Duration::from_millis(200)))
+            .unwrap();
         reload_tx.send(()).unwrap();
         let mut event = String::new();
         let deadline = Instant::now() + Duration::from_secs(2);
@@ -825,8 +866,7 @@ mod tests {
                 Ok(count) => event.push_str(&String::from_utf8_lossy(&chunk[..count])),
                 Err(error)
                     if error.kind() == std::io::ErrorKind::WouldBlock
-                        || error.kind() == std::io::ErrorKind::TimedOut =>
-                {}
+                        || error.kind() == std::io::ErrorKind::TimedOut => {}
                 Err(_) => break,
             }
         }

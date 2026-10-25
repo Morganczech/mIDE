@@ -1,4 +1,5 @@
 use crate::filesystem::{AppError, Result};
+use notify::Watcher;
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
@@ -8,7 +9,6 @@ use std::{
     thread,
     time::Duration,
 };
-use notify::Watcher;
 use tauri::{AppHandle, Emitter};
 
 const INVALID: &str = "Omarchy theme file is invalid.";
@@ -76,10 +76,7 @@ fn hex_color(value: &str) -> bool {
     let Some(rest) = value.strip_prefix('#') else {
         return false;
     };
-    rest.len() == 6
-        && rest
-            .chars()
-            .all(|character| character.is_ascii_hexdigit())
+    rest.len() == 6 && rest.chars().all(|character| character.is_ascii_hexdigit())
 }
 pub fn parse_palette(text: &str) -> Result<BTreeMap<String, String>> {
     if text.len() > 65536 {
@@ -96,9 +93,9 @@ pub fn parse_palette(text: &str) -> Result<BTreeMap<String, String>> {
         };
         let key = key.trim();
         if key.is_empty()
-            || !key.chars().all(|character| {
-                character.is_ascii_alphanumeric() || character == '_'
-            })
+            || !key
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || character == '_')
         {
             return Err(invalid());
         }
@@ -173,11 +170,9 @@ fn state_directory() -> Result<PathBuf> {
 #[tauri::command]
 pub fn read_omarchy_theme() -> Result<OmarchyTheme> {
     let home = std::env::var_os("HOME").ok_or_else(unavailable)?;
-    let slug = fs::read_to_string(
-        PathBuf::from(&home)
-            .join(".local/state/omarchy/current/theme.name"),
-    )
-    .map_err(|_| unavailable())?;
+    let slug =
+        fs::read_to_string(PathBuf::from(&home).join(".local/state/omarchy/current/theme.name"))
+            .map_err(|_| unavailable())?;
     resolve_palette(
         slug.trim(),
         Path::new(&home),
@@ -251,12 +246,11 @@ bright_magenta = "#b48ead"
     fn parses_nord_and_rejects_bad_palettes() {
         let colors = parse_palette(&palette("#81a1c1")).unwrap();
         assert_eq!(colors.get("accent").map(String::as_str), Some("#81a1c1"));
-        assert!(
-            parse_palette(&palette("#81a1c1").replace("orange = \"#d5967a\"\n", "")).is_err()
-        );
+        assert!(parse_palette(&palette("#81a1c1").replace("orange = \"#d5967a\"\n", "")).is_err());
         assert!(parse_palette(&palette("red")).is_err());
         assert!(
-            parse_palette(&palette("#81a1c1").replace("mode = \"dark\"", "mode = \"blue\"")).is_err()
+            parse_palette(&palette("#81a1c1").replace("mode = \"dark\"", "mode = \"blue\""))
+                .is_err()
         );
     }
     #[test]

@@ -7,10 +7,10 @@ import { prepareLanguage } from "../src/editor/languages";
 const fixture = readFileSync(
   new URL("./fixtures/sample.mdx", import.meta.url),
   "utf8",
-);
+).replace(/\r\n/g, "\n");
 beforeAll(() => prepareLanguage("sample.mdx"));
-function highlights(text: string) {
-  const { state } = createEditorState(text, "sample.mdx", "LF");
+function highlights(text: string, lineEnding: "LF" | "CRLF" = "LF") {
+  const { state } = createEditorState(text, "sample.mdx", lineEnding);
   const tree =
     ensureSyntaxTree(state, state.doc.length, 5000) ?? syntaxTree(state);
   const tokens: { text: string; classes: string; from: number; to: number }[] =
@@ -39,6 +39,13 @@ describe("MDX highlighting only", () => {
     expect(has("color", "propertyName")).toBe(true);
     expect(state.doc.toString()).toBe(fixture);
     expect(state.languageDataAt("autocomplete", 0)).toEqual([]);
+    const crlf = highlights(fixture.replace(/\n/g, "\r\n"), "CRLF");
+    expect(
+      crlf.tokens.some(
+        (token) =>
+          token.text.includes("Hello MDX") && token.classes.includes("string"),
+      ),
+    ).toBe(true);
   });
   it.each([
     ["html", "<main>Hello</main>", "main", "typeName"],
