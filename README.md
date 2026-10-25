@@ -4,11 +4,26 @@
 
 It provides the essentials for editing HTML, CSS, JavaScript, TypeScript, React and Astro. It deliberately leaves out code suggestions, automatic completion, auto-closing tags and brackets, AI assistants and language servers. The goal is to give learners a comfortable place to practice writing and understanding their own code.
 
-Designed for Linux, macOS and Windows. The current version is **0.4.0**; Linux is the primary development and verification platform.
+The current version is **0.4.0**. Linux is the current release target, with AppImage as the download format. **Testing has been performed only on Arch Linux / Omarchy.** Other Linux distributions, macOS and Windows have not been manually verified. Cross-platform code and CI configuration remain in the repository, but do not imply verified support.
 
 Tauri 2 · Rust · React · TypeScript · Vite · CodeMirror 6
 
-## Run
+## Linux AppImage
+
+The public release format is an **x86_64 AppImage** for Linux PCs with Intel or AMD processors. An ARM computer needs a separate build. Download published packages from [GitHub Releases](https://github.com/Morganczech/mIDE/releases). A separate release workflow builds on Ubuntu 22.04 when a version tag is pushed and uploads an AppImage and `SHA256SUMS` to a draft release for review before publication.
+
+Download the AppImage from a published release, allow execution in your file manager's properties, and open it. Alternatively, from its download directory:
+
+```sh
+chmod +x ./mIDE_*.AppImage
+./mIDE_*.AppImage
+```
+
+AppImage does not guarantee compatibility with every distribution. Some systems require FUSE support; see the [AppImage troubleshooting guide](https://docs.appimage.org/user-guide/troubleshooting/fuse.html). Older systems can also lack the required system libraries. For wider compatibility, distribution builds should use an older supported build environment such as Ubuntu 22.04, as described in [Tauri's AppImage guide](https://v2.tauri.app/distribute/appimage/). This is a build recommendation, not a claim that mIDE has been tested on Ubuntu.
+
+**Node.js is required for Format Document**, including when running an AppImage. Node must be available on the application's PATH; a runtime is not bundled. Editing files, image previews and the integrated terminal do not require Node.js. Developing or running a project's own tools may have additional requirements.
+
+## Run from source
 
 Install [Tauri's platform prerequisites](https://v2.tauri.app/start/prerequisites/), stable Rust and Node.js 22.12+ (Node 24 LTS recommended).
 
@@ -24,10 +39,12 @@ On Arch Linux, install the packages listed in Tauri's Arch prerequisites, includ
 ## Build
 
 ```sh
-npm run tauri build
+npm run tauri build -- --bundles appimage
 ```
 
-Build packages on each target OS. Formatter resources include a native Astro compiler dependency selected for the build host: do not copy `node_modules` between platforms or CPU architectures. Node.js must also be available on the installed application's PATH for Format Document. The editor and terminal do not require Node.js. No Node runtime is embedded.
+The command above builds only the Linux AppImage. Output is written to `src-tauri/target/release/bundle/appimage/`. Build on Linux; a local Arch/Omarchy build does not establish compatibility with older distributions.
+
+For development builds on other operating systems, use `npm run tauri build` on the target OS. Those platforms are currently unverified. Formatter resources include a native Astro compiler dependency selected for the build host: do not copy `node_modules` between platforms or CPU architectures. Node.js must also be available on the installed application's PATH for Format Document. The editor and terminal do not require Node.js. No Node runtime is embedded.
 
 For a local executable without installers:
 
@@ -48,7 +65,6 @@ Hover a standard HTML tag for a short offline description and **Read on MDN**, w
 Hover a common CSS property name for an offline explanation, a small example and a direct MDN property link. This works in CSS files, HTML/Astro style blocks and static HTML/Astro style attributes. Selectors, comments, custom properties and JavaScript style objects do not trigger CSS documentation. **CSS documentation on hover** is an independent, initially enabled setting.
 
 **Sources → Troubleshooting** contains five offline guides covering stylesheet loading, missing images, ineffective CSS rules, unresponsive buttons and small-screen layouts. Each guide explains ordered checks in mIDE and browser developer tools. Search includes guide steps and examples; MDN links open externally. Escape collapses an expanded guide before leaving Sources. These guides do not scan or change project files.
-
 
 Go Live, at the trailing end of the status bar, serves the open folder at `http://127.0.0.1` on the first free port from 5500 through 5509 and opens that address in the system browser. The button then shows the port; click it again to stop. Saving a file reloads the open pages. The project-root `index.html` also has Open in Browser in its right-click menu. Switching projects or closing the window stops the server. Focus Mode hides the control and leaves the server running.
 
@@ -77,7 +93,7 @@ Open **Menu → Keyboard Shortcuts** (or press **F1**) to see the shortcut refer
 
 HTML, CSS, JavaScript, TypeScript, JSX, TSX, Astro, JSON, Markdown and MDX have syntax highlighting. Other UTF-8 files open as plain text. Text files over 16 MiB, other binary files and invalid UTF-8 are rejected. UTF-8 BOM and LF/CRLF are preserved. Names and paths support Unicode. Paths through symlinks outside the selected project cannot be opened or edited; deleting a link deletes the link itself.
 
-Formatting is explicit, uses the shipped pinned Prettier and Astro plugin, makes one undoable edit and does not save. Project Prettier configs/plugins are intentionally not executed. No format-on-save. Auto Save is enabled by default and saves changed open files when focus leaves the editor (including switching apps). Turn it off in Settings to save manually. Conflicts and failed writes keep files marked as unsaved. Theme, interface/editor font families and editor text size (10–32px, default 14px) are persisted preferences; project and open-file sessions are not restored.
+Formatting is explicit, uses the shipped pinned Prettier and Astro plugin, and makes one undoable edit. Formatting itself does not save; Auto Save can save the result when you leave the editor. Project Prettier configs/plugins are intentionally not executed. No format-on-save. Auto Save is enabled by default and saves changed open files when focus leaves the editor (including switching apps). Turn off **Settings → Saving → Auto Save on leaving the editor** to save manually. This preference is stored locally. It saves changed open files, not every file in the project. Conflicts and failed writes keep files marked as unsaved. Theme, interface/editor font families and editor text size (10–32px, default 14px) are persisted preferences; project and open-file sessions are not restored.
 
 There is no AI, autocomplete, LSP, diagnostics, auto-closing tags/brackets, debugger, Git UI, documentation viewer, telemetry, account or extension system. Git runs in the terminal. Documentation belongs in your browser.
 
@@ -99,7 +115,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -
 cargo fmt --manifest-path src-tauri/Cargo.toml --check
 ```
 
-Formatter tests spawn Node. PTY tests spawn the system shell. Environments that forbid child processes cannot run these integration checks faithfully. CI builds on Linux, macOS and Windows; native interactive verification is still required on each OS.
+Formatter tests spawn Node. PTY tests spawn the system shell. Environments that forbid child processes cannot run these integration checks faithfully. The CI workflow is configured to run checks and executable builds on Linux, macOS and Windows, without packaging installers or publishing releases. The separate [release workflow](.github/workflows/release.yml) creates Linux AppImage draft releases from matching `v` version tags; release notes live in `docs/releases/<tag>.md`. **Completed testing and interactive verification have been performed only on Arch Linux / Omarchy.** CI configuration is not evidence that other operating systems or distributions have been tested successfully.
 
 For an opt-in native Linux smoke test, see [tests/VERIFICATION.md](tests/VERIFICATION.md). The `smoke-test` feature and `VITE_NATIVE_SMOKE=1` build flag are test-only; ordinary builds contain neither the injected test script nor the editor test hook.
 
@@ -150,6 +166,6 @@ Project search skips `.git`, `node_modules`, `target`, `dist`, `build`, `.next`,
 
 ## Sources
 
-Open Sources from the menu or start screen to browse 72 documentation, learning, tool and asset links. Search by name, domain or topic, filter by category, and star favorites. Links open in the system browser.
+Open Sources from the menu or start screen, or toggle it with **Ctrl+Alt+S** (**Cmd+Alt+S** on macOS), to browse 72 documentation, learning, tool and asset links. Search by name, domain or topic, filter by category, and star favorites. Links open in the system browser.
 
 Add and edit personal sources, hide or restore built-in entries, or save a built-in entry as your own. Collection offers JSON import (merge or replace) and export through native file dialogs. Your collection is stored locally across projects. See [Sources format and catalog maintenance](docs/sources.md).
