@@ -25,6 +25,7 @@ import { tags } from "@lezer/highlight";
 import { cssColorPicker } from "./css-colors";
 import { findExtensions } from "./find";
 import { languageFor } from "./languages";
+import { expandLorem } from "./lorem";
 
 export const editorFontSize = new Compartment();
 
@@ -73,6 +74,7 @@ export function createEditorState(
       cssColorPicker,
       keymap.of([
         { key: "Enter", run: insertNewlineAndIndent },
+        { key: "Tab", run: expandLorem },
         indentWithTab,
         ...historyKeymap,
         ...defaultKeymap.filter((binding) => binding.key !== "Mod-Enter"),
