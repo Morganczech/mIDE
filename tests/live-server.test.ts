@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIVE_STOPPED, liveControl, startedStatus, type LiveServerInfo } from "../src/lib/live-server";
+import { canOpenInBrowser, LIVE_STOPPED, liveControl, startedStatus, type LiveServerInfo } from "../src/lib/live-server";
 
 const running: LiveServerInfo = {
   port: 5500,
@@ -40,5 +40,13 @@ describe("live server control", () => {
 
   it("uses the stopped sentence", () => {
     expect(LIVE_STOPPED).toBe("Live Server stopped");
+  });
+
+  it("offers the browser only for the root index", () => {
+    expect(canOpenInBrowser({ path: "index.html", isDirectory: false })).toBe(true);
+    expect(canOpenInBrowser({ path: "docs/index.html", isDirectory: false })).toBe(false);
+    expect(canOpenInBrowser({ path: "index.html", isDirectory: true })).toBe(false);
+    expect(canOpenInBrowser({ path: "app.css", isDirectory: false })).toBe(false);
+    expect(canOpenInBrowser(null)).toBe(false);
   });
 });

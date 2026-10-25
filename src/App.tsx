@@ -327,8 +327,27 @@ export default function App() {
         );
       changed();
     });
-  const fileAction = (action: FileAction, entry: Entry | null) =>
-    run(async () => {
+  const fileAction = (action: FileAction, entry: Entry | null) => {
+    if (action === "browser" && liveBusy.current) return;
+    return run(async () => {
+      if (action === "browser") {
+        if (liveBusy.current) return;
+        liveBusy.current = true;
+        try {
+          if (liveRef.current) {
+            await backend.liveServerOpen();
+          } else {
+            const info = await backend.liveServerStart();
+            const status = startedStatus(info);
+            setLiveNow({ port: info.port, url: info.url });
+            setLiveMessage(status.message);
+            setError(status.error);
+          }
+        } finally {
+          liveBusy.current = false;
+        }
+        return;
+      }
       if (action === "refresh") {
         setVersion((v) => v + 1);
         return;
@@ -397,6 +416,7 @@ export default function App() {
       }
       changed();
     });
+  };
   const format = () =>
     run(async () => {
       if (!active) return;

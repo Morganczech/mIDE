@@ -1,7 +1,14 @@
 import { useEffect, useState, useRef } from "react";
 import { backend, errorMessage, type Entry } from "../lib/backend";
+import { canOpenInBrowser } from "../lib/live-server";
 import { FileIcon } from "./FileIcon";
-export type FileAction = "file" | "folder" | "rename" | "delete" | "refresh";
+export type FileAction =
+  | "file"
+  | "folder"
+  | "rename"
+  | "delete"
+  | "refresh"
+  | "browser";
 interface Props {
   version: number;
   activePath?: string;
@@ -153,6 +160,9 @@ export function Explorer(props: Props & { name: string }) {
     if (menu) menuRef.current?.querySelector("button")?.focus();
   }, [menu]);
   const actions: [FileAction, string][] = [
+    ...(menu?.entry && canOpenInBrowser(menu.entry)
+      ? ([["browser", "Open in Browser"]] as [FileAction, string][])
+      : []),
     ["file", "New File"],
     ["folder", "New Folder"],
     ...(menu?.entry

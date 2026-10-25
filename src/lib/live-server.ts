@@ -24,3 +24,9 @@ export function startedStatus(info: LiveServerInfo) {
 }
 
 export const LIVE_STOPPED = "Live Server stopped";
+
+export function canOpenInBrowser(
+  entry: { path: string; isDirectory: boolean } | null,
+) {
+  return !!entry && !entry.isDirectory && entry.path === "index.html";
+}
