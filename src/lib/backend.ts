@@ -39,6 +39,17 @@ export interface OmarchyThemeFile {
   colors: Record<string, string>;
 }
 export const backend = {
+  copyPath: (path: string, absolute: boolean) =>
+    invoke<string>("copy_entry_path", { path, absolute }),
+  image: (path: string) =>
+    invoke<{ bytes: number[]; mime: string; size: number }>("read_image", {
+      path,
+    }),
+  importFiles: (paths: string[], directory: string) =>
+    invoke<{ copied: string[]; failed: string[] }>("import_files", {
+      paths,
+      directory,
+    }),
   importSources: () => invoke<string | null>("import_sources"),
   exportSources: (text: string) => invoke<boolean>("export_sources", { text }),
   openSourceUrl: (url: string) => invoke<void>("open_source_url", { url }),
@@ -51,7 +62,8 @@ export const backend = {
   terminalRunning: () => invoke<boolean>("terminal_running"),
   format: (path: string, text: string) =>
     invoke<string>("format_document", { path, text }),
-  openProject: () => invoke<Project | null>("open_project"),
+  openProject: (path?: string) =>
+    invoke<Project | null>("open_project", { path: path ?? null }),
   list: (path: string) => invoke<Entry[]>("list_directory", { path }),
   read: (path: string) => invoke<FileData>("read_file", { path }),
   save: (path: string, text: string, revision: string, bom: boolean) =>

@@ -1,3 +1,11 @@
+import {
+  loadRecentProjects,
+  rememberProject,
+  storeRecentProjects,
+} from "./lib/recent-projects";
+import { ImagePreview } from "./components/ImagePreview";
+import { MoveDialog } from "./components/MoveDialog";
+import { isImage, clearImages, loadImagePreferences } from "./lib/images";
 import { ProjectSearch } from "./components/ProjectSearch";
 import { About } from "./components/About";
 import {
@@ -47,6 +55,7 @@ import {
 import { LIVE_STOPPED, liveControl, startedStatus } from "./lib/live-server";
 import {
   openDocument,
+  openImageDocument,
   isDirty,
   documentText,
   type OpenDocument,
@@ -58,12 +67,25 @@ import { languageFor, prepareLanguage } from "./editor/languages";
 const Terminal = lazy(() => import("./components/Terminal"));
 
 export default function App() {
+  const [imagePreferences, setImagePreferences] =
+    useState(loadImagePreferences);
+  const [moveEntry, setMoveEntry] = useState<Entry | null>(null);
+  useEffect(() => {
+    for (const [key, value] of Object.entries(imagePreferences))
+      localStorage.setItem(`mide-${key}`, value ? "1" : "0");
+  }, [imagePreferences]);
   const [project, setProject] = useState<Project | null>(null);
+  const [recentProjects, setRecentProjects] = useState(loadRecentProjects);
+  useEffect(() => storeRecentProjects(recentProjects), [recentProjects]);
   const documents = useRef<OpenDocument[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
   const [, redraw] = useState(0);
   const changed = useCallback(() => redraw((n) => n + 1), []);
   const [version, setVersion] = useState(0);
+  const bumpVersion = () => {
+    clearImages();
+    setVersion((v) => v + 1);
+  };
   const [error, setError] = useState("");
   const [dialog, setDialog] = useState<DialogRequest | null>(null);
   const [customThemes, setCustomThemes] = useState(loadThemes);
@@ -199,11 +221,13 @@ export default function App() {
     }
   };
   const save = async (doc: OpenDocument) => {
+    if (doc.kind === "image") return;
     const snapshot = doc.state.doc;
     const text = documentText(doc);
     const revision = await backend.save(doc.path, text, doc.revision, doc.bom);
     doc.revision = revision;
     doc.saved = snapshot;
+    if (isImage(doc.path)) bumpVersion();
     changed();
   };
   const mayClose = async (docs: OpenDocument[]) => {
@@ -222,7 +246,7 @@ export default function App() {
     }
     return true;
   };
-  const openFolder = () =>
+  const openFolder = (path?: string) =>
     run(async () => {
       if (!(await mayClose(documents.current))) return;
       if (
@@ -234,7 +258,7 @@ export default function App() {
         )) !== "Stop"
       )
         return;
-      const next = await backend.openProject();
+      const next = await backend.openProject(path);
       if (!next) return;
       const pendingLive = liveTask.current;
       liveSwitching.current = true;
@@ -255,7 +279,8 @@ export default function App() {
       setTerminalOpen(false);
       setActiveId(null);
       setProject(next);
-      setVersion((v) => v + 1);
+      setRecentProjects((previous) => rememberProject(previous, next));
+      bumpVersion();
     });
   const toggleLive = () => {
     if (liveBusy.current) return;
@@ -289,15 +314,23 @@ export default function App() {
       if (liveTask.current === task) liveTask.current = null;
     });
   };
-  const openFile = (path: string, match?: ProjectMatch) =>
+  const openFile = (path: string, match?: ProjectMatch, source = false) =>
     run(async () => {
-      let doc = documents.current.find((item) => item.path === path);
+      let doc = documents.current.find(
+        (item) =>
+          item.path === path &&
+          (item.kind === "image") === (isImage(path) && !source && !match),
+      );
       if (!doc) {
         await prepareLanguage(path);
-        doc = openDocument(path, await backend.read(path));
+        doc =
+          isImage(path) && !source && !match
+            ? openImageDocument(path)
+            : openDocument(path, await backend.read(path));
+        clearImages();
         documents.current.push(doc);
       }
-      if (match) {
+      if (match && doc.kind === "text") {
         const line = doc.state.doc.line(
           Math.min(match.line, doc.state.doc.lines),
         );
@@ -341,7 +374,62 @@ export default function App() {
         );
       changed();
     });
+  const movePath = async (entry: Entry, directory: string) => {
+    if (directory === parentPath(entry.path)) return;
+    if (entry.isDirectory && isWithin(directory, entry.path))
+      throw new Error("A folder cannot be moved into itself.");
+    const destination = directory ? `${directory}/${entry.name}` : entry.name;
+    await relocate(entry.path, destination);
+  };
+  const relocate = async (path: string, destination: string) => {
+    const affected = documents.current.filter((doc) =>
+      isWithin(doc.path, path),
+    );
+    await Promise.all(
+      affected
+        .filter((doc) => doc.kind === "text")
+        .map((doc) =>
+          prepareLanguage(destination + doc.path.slice(path.length)),
+        ),
+    );
+    await backend.rename(path, destination);
+    for (const doc of affected) {
+      doc.path = destination + doc.path.slice(path.length);
+      if (doc.kind === "image") continue;
+      const effects = doc.language.reconfigure(languageFor(doc.path));
+      if (activeId === doc.id && view.current)
+        view.current.dispatch({ effects });
+      else doc.state = doc.state.update({ effects }).state;
+    }
+    bumpVersion();
+    changed();
+  };
+  const closeMove = () => {
+    const path = moveEntry?.path;
+    setMoveEntry(null);
+    requestAnimationFrame(() => {
+      const row = [
+        ...document.querySelectorAll<HTMLButtonElement>(".tree-row"),
+      ].find((row) => row.dataset.path === path);
+      (
+        row ??
+        document.querySelector<HTMLButtonElement>(
+          '[aria-label="Project actions"]',
+        )
+      )?.focus();
+    });
+  };
   const fileAction = (action: FileAction, entry: Entry | null) => {
+    if (entry && action === "move") {
+      setMoveEntry(entry);
+      return;
+    }
+    if (entry && (action === "copy-relative" || action === "copy-absolute")) {
+      void run(async () => {
+        await backend.copyPath(entry.path, action === "copy-absolute");
+      });
+      return;
+    }
     if (action === "browser") {
       if (liveBusy.current) return;
       liveBusy.current = true;
@@ -375,7 +463,7 @@ export default function App() {
     }
     return run(async () => {
       if (action === "refresh") {
-        setVersion((v) => v + 1);
+        bumpVersion();
         return;
       }
       if (action === "file" || action === "folder") {
@@ -393,7 +481,7 @@ export default function App() {
           : parentPath(entry?.path ?? "");
         const path = parent ? `${parent}/${name}` : name;
         await backend.create(path, action === "folder");
-        setVersion((v) => v + 1);
+        bumpVersion();
         if (action === "file") {
           const doc = openDocument(path, await backend.read(path));
           documents.current.push(doc);
@@ -415,15 +503,7 @@ export default function App() {
             throw new Error("Enter a name without path separators.");
           const parent = parentPath(entry.path);
           const destination = parent ? `${parent}/${name}` : name;
-          await backend.rename(entry.path, destination);
-          for (const doc of affected) {
-            doc.path = destination + doc.path.slice(entry.path.length);
-            await prepareLanguage(doc.path);
-            const effects = doc.language.reconfigure(languageFor(doc.path));
-            if (activeId === doc.id && view.current)
-              view.current.dispatch({ effects });
-            else doc.state = doc.state.update({ effects }).state;
-          }
+          await relocate(entry.path, destination);
         } else {
           const answer = await ask(
             "Delete permanently?",
@@ -438,14 +518,14 @@ export default function App() {
           if (affected.some((doc) => doc.id === activeId))
             setActiveId(documents.current[0]?.id ?? null);
         }
-        setVersion((v) => v + 1);
+        bumpVersion();
       }
       changed();
     });
   };
   const format = () =>
     run(async () => {
-      if (!active) return;
+      if (!active || active.kind === "image") return;
       const snapshot = active.state.doc;
       const result = await backend.format(active.path, documentText(active));
       if (!active.state.doc.eq(snapshot))
@@ -580,7 +660,7 @@ export default function App() {
     localStorage.setItem("mide-font-size", String(fontSize));
   }, [fontSize]);
   currentActions.current = {
-    openFolder,
+    openFolder: () => openFolder(),
     format,
     toggleTerminal: () => {
       if (project) {
@@ -605,7 +685,14 @@ export default function App() {
   };
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
-      if (event.isComposing || dialog || aboutOpen || projectSearchOpen) return;
+      if (
+        event.isComposing ||
+        dialog ||
+        moveEntry ||
+        aboutOpen ||
+        projectSearchOpen
+      )
+        return;
       if (sourcesOpen) {
         if (
           (event.metaKey || event.ctrlKey) &&
@@ -667,7 +754,8 @@ export default function App() {
         event.key === "Escape" &&
         focus &&
         !menu &&
-        !document.querySelector(".find-panel")
+        !document.querySelector(".find-panel") &&
+        !document.querySelector(".cm-tooltip")
       ) {
         event.preventDefault();
         event.stopPropagation();
@@ -738,6 +826,7 @@ export default function App() {
     return () => window.removeEventListener("keydown", keydown, true);
   }, [
     dialog,
+    moveEntry,
     focus,
     menu,
     shortcutsOpen,
@@ -776,9 +865,10 @@ export default function App() {
         `${active ? `${isDirty(active) ? "• " : ""}${active.path} — ` : ""}${project ? `${project.name} — ` : ""}mIDE`,
       );
   });
-  const position = active
-    ? active.state.doc.lineAt(active.state.selection.main.head)
-    : null;
+  const position =
+    active && active.kind !== "image"
+      ? active.state.doc.lineAt(active.state.selection.main.head)
+      : null;
   return (
     <div
       className={`app ${project ? "has-project" : ""} ${focus ? "focus-mode" : ""} ${settingsOpen || sourcesOpen ? "settings-open" : ""}`}
@@ -788,6 +878,19 @@ export default function App() {
         <Explorer
           key={project.path}
           name={project.name}
+          move={(entry, directory) => {
+            void run(() => movePath(entry, directory));
+          }}
+          importFiles={(paths, directory) => {
+            void run(async () => {
+              const report = await backend.importFiles(paths, directory);
+              bumpVersion();
+              setLiveMessage(
+                `Imported ${report.copied.length} file${report.copied.length === 1 ? "" : "s"}.`,
+              );
+              if (report.failed.length) setError(report.failed.join("; "));
+            });
+          }}
           version={version}
           activePath={active?.path}
           open={openFile}
@@ -799,6 +902,8 @@ export default function App() {
         {sourcesOpen && <Sources close={closeSources} />}
         {settingsOpen && (
           <Settings
+            imagePreferences={imagePreferences}
+            setImagePreferences={setImagePreferences}
             theme={theme}
             setTheme={chooseTheme}
             customThemes={customThemes}
@@ -871,7 +976,7 @@ export default function App() {
                   </button>
                   <button
                     role="menuitem"
-                    disabled={!active}
+                    disabled={!active || active.kind === "image"}
                     onClick={() => {
                       setMenu(false);
                       void currentActions.current.save();
@@ -882,7 +987,7 @@ export default function App() {
                   </button>
                   <button
                     role="menuitem"
-                    disabled={!active}
+                    disabled={!active || active.kind === "image"}
                     onClick={() => {
                       setMenu(false);
                       if (view.current) openSearchPanel(view.current);
@@ -903,7 +1008,7 @@ export default function App() {
                   </button>
                   <button
                     role="menuitem"
-                    disabled={!active}
+                    disabled={!active || active.kind === "image"}
                     onClick={() => {
                       setMenu(false);
                       void format();
@@ -1016,9 +1121,18 @@ export default function App() {
             </button>
           </div>
         )}
-        {active ? (
+        {active?.kind === "image" ? (
+          <ImagePreview
+            key={active.id}
+            path={active.path}
+            version={version}
+            source={() => void openFile(active.path, undefined, true)}
+          />
+        ) : active ? (
           <Editor
             document={active}
+            imagePreferences={imagePreferences}
+            version={version}
             fontSize={fontSize}
             fontFamily={editorFont}
             viewRef={view}
@@ -1026,28 +1140,74 @@ export default function App() {
           />
         ) : (
           <div className="empty-state">
-            <div className="empty-actions">
-              <button disabled={busy} onClick={() => void openFolder()}>
-                Open Folder
-                <span className="shortcut">
-                  {navigator.platform.includes("Mac") ? "⌘ O" : "Ctrl O"}
-                </span>
-              </button>
-              <button
-                className="settings-link"
-                onClick={() => setSettingsOpen(true)}
-              >
-                Settings
-              </button>
-              <button className="settings-link" onClick={openSources}>
-                Sources
-              </button>
-              <button
-                className="settings-link"
-                onClick={() => setAboutOpen(true)}
-              >
-                About mIDE
-              </button>
+            <div className="start-content">
+              <div className="empty-actions">
+                <button disabled={busy} onClick={() => void openFolder()}>
+                  Open Folder
+                  <span className="shortcut">
+                    {navigator.platform.includes("Mac") ? "⌘ O" : "Ctrl O"}
+                  </span>
+                </button>
+                <button
+                  className="settings-link"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  Settings
+                </button>
+                <button className="settings-link" onClick={openSources}>
+                  Sources
+                </button>
+                <button
+                  className="settings-link"
+                  onClick={() => setAboutOpen(true)}
+                >
+                  About mIDE
+                </button>
+              </div>
+              {!project && recentProjects.length > 0 && (
+                <section
+                  className="recent-projects"
+                  aria-labelledby="recent-projects-heading"
+                >
+                  <h2 id="recent-projects-heading">Recent projects</h2>
+                  <ul>
+                    {recentProjects.map((recent) => (
+                      <li key={recent.path}>
+                        <button
+                          className="recent-project-open"
+                          disabled={busy}
+                          onClick={() => void openFolder(recent.path)}
+                          title={recent.path}
+                        >
+                          <span className="recent-project-name">
+                            {recent.name}
+                          </span>
+                          <span className="recent-project-path">
+                            {recent.path}
+                          </span>
+                        </button>
+                        <button
+                          className="recent-project-remove"
+                          disabled={busy}
+                          aria-label={`Remove ${recent.name} from recent projects`}
+                          title="Remove from recent projects"
+                          onClick={() =>
+                            setRecentProjects((previous) =>
+                              previous.filter(
+                                (item) => item.path !== recent.path,
+                              ),
+                            )
+                          }
+                        >
+                          <svg viewBox="0 0 16 16" aria-hidden="true">
+                            <path d="m4 4 8 8m0-8-8 8" />
+                          </svg>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
             </div>
           </div>
         )}
@@ -1069,7 +1229,7 @@ export default function App() {
       {project && (
         <footer className="status">
           <span className="status-path">{active?.path ?? project.name}</span>
-          {active && (
+          {active?.kind === "text" && position && (
             <>
               <span>{active.lineEnding}</span>
               <span>UTF-8{active.bom ? " BOM" : ""}</span>
@@ -1102,10 +1262,12 @@ export default function App() {
       {projectSearchOpen && project && (
         <ProjectSearch
           buffers={() =>
-            documents.current.map((doc) => ({
-              path: doc.path,
-              text: documentText(doc),
-            }))
+            documents.current
+              .filter((doc) => doc.kind !== "image")
+              .map((doc) => ({
+                path: doc.path,
+                text: documentText(doc),
+              }))
           }
           select={(match) => {
             setProjectSearchOpen(false);
@@ -1118,6 +1280,17 @@ export default function App() {
         />
       )}
 
+      {moveEntry && (
+        <MoveDialog
+          entry={moveEntry}
+          close={closeMove}
+          move={(directory) => {
+            const entry = moveEntry;
+            setMoveEntry(null);
+            void run(() => movePath(entry, directory));
+          }}
+        />
+      )}
       {dialog && (
         <Dialog
           key={dialog.title + dialog.message + dialog.input}

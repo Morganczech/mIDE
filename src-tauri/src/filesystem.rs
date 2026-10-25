@@ -181,11 +181,16 @@ pub fn write_document(path: &Path, text: &str, expected: &str, bom: bool) -> Res
 #[tauri::command]
 pub async fn open_project(
     app: AppHandle,
+    path: Option<String>,
     workspace: State<'_, Workspace>,
     terminal: State<'_, crate::terminal::TerminalState>,
 ) -> Result<Option<Project>> {
     #[cfg(feature = "smoke-test")]
-    if let Ok(folder) = std::env::var("MIDE_SMOKE_PROJECT") {
+    if let Some(folder) = path
+        .is_none()
+        .then(|| std::env::var("MIDE_SMOKE_PROJECT").ok())
+        .flatten()
+    {
         let path = PathBuf::from(folder).canonicalize()?;
         let project = Project {
             name: "mide-native-smoke".into(),
@@ -198,20 +203,29 @@ pub async fn open_project(
             .map_err(|_| AppError::new("STATE", "Workspace unavailable"))? = Some(path);
         return Ok(Some(project));
     }
-    let folder =
-        tauri::async_runtime::spawn_blocking(move || app.dialog().file().blocking_pick_folder())
-            .await
-            .map_err(|e| AppError::new("DIALOG", e.to_string()))?;
-    let Some(folder) = folder else {
-        return Ok(None);
+    let folder = if let Some(path) = path {
+        let path = PathBuf::from(path);
+        if !path.is_absolute() {
+            return Err(AppError::new(
+                "PATH",
+                "Choose an absolute project folder path",
+            ));
+        }
+        path
+    } else {
+        let folder = tauri::async_runtime::spawn_blocking(move || {
+            app.dialog().file().blocking_pick_folder()
+        })
+        .await
+        .map_err(|e| AppError::new("DIALOG", e.to_string()))?;
+        let Some(folder) = folder else {
+            return Ok(None);
+        };
+        folder
+            .into_path()
+            .map_err(|e| AppError::new("PATH", e.to_string()))?
     };
-    let path = folder
-        .into_path()
-        .map_err(|e| AppError::new("PATH", e.to_string()))?
-        .canonicalize()?;
-    if !path.is_dir() {
-        return Err(AppError::new("PATH", "Choose a directory"));
-    }
+    let path = project_directory(&folder)?;
     terminal.stop();
     let project = Project {
         name: path
@@ -227,6 +241,28 @@ pub async fn open_project(
         .map_err(|_| AppError::new("STATE", "Workspace unavailable"))? = Some(path);
     Ok(Some(project))
 }
+fn project_directory(folder: &Path) -> Result<PathBuf> {
+    let path = folder.canonicalize().map_err(|error| {
+        AppError::new(
+            "PROJECT",
+            format!("Cannot open {}: {error}", folder.display()),
+        )
+    })?;
+    if !path.is_dir() {
+        return Err(AppError::new(
+            "PROJECT",
+            "This project path is not a folder",
+        ));
+    }
+    fs::read_dir(&path).map_err(|error| {
+        AppError::new(
+            "PROJECT",
+            format!("Cannot read {}: {error}", folder.display()),
+        )
+    })?;
+    Ok(path)
+}
+
 #[tauri::command]
 pub fn list_directory(workspace: State<'_, Workspace>, path: String) -> Result<Vec<Entry>> {
     let root = workspace.root()?;
@@ -288,13 +324,25 @@ pub fn rename_entry(
     path: String,
     destination: String,
 ) -> Result<()> {
-    let root = workspace.root()?;
-    let source = target(&root, &path)?;
-    let dest = target(&root, &destination)?;
+    move_entry(&workspace.root()?, &path, &destination)
+}
+
+fn move_entry(root: &Path, path: &str, destination: &str) -> Result<()> {
+    let source = target(root, path)?;
+    let dest = target(root, destination)?;
+    if source == dest {
+        return Ok(());
+    }
     if fs::symlink_metadata(&dest).is_ok() {
         return Err(AppError::new(
             "EXISTS",
             "An item with that name already exists",
+        ));
+    }
+    if source.is_dir() && dest.starts_with(&source) {
+        return Err(AppError::new(
+            "PATH",
+            "A folder cannot be moved into itself",
         ));
     }
     fs::rename(source, dest)?;
@@ -310,6 +358,137 @@ pub fn delete_entry(workspace: State<'_, Workspace>, path: String) -> Result<()>
         fs::remove_dir_all(dest)?;
     }
     Ok(())
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageData {
+    bytes: Vec<u8>,
+    mime: &'static str,
+    size: usize,
+}
+
+#[tauri::command]
+pub fn read_image(workspace: State<'_, Workspace>, path: String) -> Result<ImageData> {
+    image_data(&workspace.root()?, &path)
+}
+
+fn image_data(root: &Path, path: &str) -> Result<ImageData> {
+    let source = existing(root, path)?;
+    let extension = source
+        .extension()
+        .and_then(|v| v.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let mime = match extension.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "avif" => "image/avif",
+        "svg" => "image/svg+xml",
+        "ico" => "image/x-icon",
+        _ => return Err(AppError::new("IMAGE", "Unsupported image format")),
+    };
+    let bytes = read_bytes(&source)?;
+    Ok(ImageData {
+        size: bytes.len(),
+        bytes,
+        mime,
+    })
+}
+
+#[derive(Serialize)]
+pub struct ImportReport {
+    copied: Vec<String>,
+    failed: Vec<String>,
+}
+
+pub fn copy_external(root: &Path, source: &Path, directory: &str) -> Result<String> {
+    if !source.is_absolute() {
+        return Err(AppError::new("IMPORT", "Choose an absolute source path"));
+    }
+    let metadata = fs::symlink_metadata(source)?;
+    if !metadata.is_file() {
+        return Err(AppError::new(
+            "IMPORT",
+            "Only regular files can be imported",
+        ));
+    }
+    let name = source
+        .file_name()
+        .and_then(|v| v.to_str())
+        .ok_or_else(|| AppError::new("PATH", "Invalid filename"))?;
+    let relative = if directory.is_empty() {
+        name.to_owned()
+    } else {
+        format!("{directory}/{name}")
+    };
+    let destination = target(root, &relative)?;
+    let mut input = fs::File::open(source)?;
+    let mut output = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&destination)?;
+    let result = std::io::copy(&mut input, &mut output).and_then(|_| output.sync_all());
+    if let Err(error) = result {
+        drop(output);
+        let _ = fs::remove_file(destination);
+        return Err(error.into());
+    }
+    Ok(relative)
+}
+
+#[tauri::command]
+pub async fn import_files(
+    workspace: State<'_, Workspace>,
+    paths: Vec<String>,
+    directory: String,
+) -> Result<ImportReport> {
+    let root = workspace.root()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut report = ImportReport {
+            copied: vec![],
+            failed: vec![],
+        };
+        for path in paths {
+            match copy_external(&root, Path::new(&path), &directory) {
+                Ok(path) => report.copied.push(path),
+                Err(error) => report.failed.push(format!(
+                    "{}: {}",
+                    Path::new(&path)
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy(),
+                    error.message
+                )),
+            }
+        }
+        Ok(report)
+    })
+    .await
+    .map_err(|e| AppError::new("IMPORT", e.to_string()))?
+}
+
+#[tauri::command]
+pub fn copy_entry_path(
+    app: AppHandle,
+    workspace: State<'_, Workspace>,
+    path: String,
+    absolute: bool,
+) -> Result<String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    let destination = target(&workspace.root()?, &path)?;
+    fs::symlink_metadata(&destination)?;
+    let text = if absolute {
+        destination.to_string_lossy().into_owned()
+    } else {
+        path.replace('\\', "/")
+    };
+    app.clipboard()
+        .write_text(text.clone())
+        .map_err(|e| AppError::new("CLIPBOARD", e.to_string()))?;
+    Ok(text)
 }
 
 #[cfg(test)]
@@ -367,6 +546,102 @@ mod tests {
         std::os::unix::fs::symlink(std::env::temp_dir(), root.join("outside")).unwrap();
         assert!(existing(&root, "outside").is_err());
         assert!(target(&root, "outside/file").is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn moves_files_and_folders_without_replacing_destinations() {
+        let root = fixture();
+        fs::create_dir(root.join("assets")).unwrap();
+        fs::create_dir(root.join("source")).unwrap();
+        fs::write(root.join("source/a.svg"), b"image").unwrap();
+        move_entry(&root, "source", "assets/source").unwrap();
+        assert_eq!(
+            fs::read(root.join("assets/source/a.svg")).unwrap(),
+            b"image"
+        );
+        assert!(move_entry(&root, "assets", "assets/source/nested").is_err());
+        assert!(move_entry(&root, "assets/source", "../outside").is_err());
+        assert!(move_entry(&root, "assets/source", "").is_err());
+        fs::write(root.join("a.svg"), b"existing").unwrap();
+        assert_eq!(
+            move_entry(&root, "assets/source/a.svg", "a.svg")
+                .unwrap_err()
+                .code,
+            "EXISTS"
+        );
+        assert_eq!(fs::read(root.join("a.svg")).unwrap(), b"existing");
+        move_entry(&root, "a.svg", "a.svg").unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn imports_regular_files_without_modifying_sources_or_collisions() {
+        let root = fixture();
+        let outside = fixture();
+        fs::create_dir(root.join("assets")).unwrap();
+        fs::write(outside.join("žluťoučký.png"), [0, 1, 2, 255]).unwrap();
+        let source = outside.join("žluťoučký.png");
+        assert_eq!(
+            copy_external(&root, &source, "assets").unwrap(),
+            "assets/žluťoučký.png"
+        );
+        assert_eq!(
+            fs::read(&source).unwrap(),
+            fs::read(root.join("assets/žluťoučký.png")).unwrap()
+        );
+        assert!(copy_external(&root, &source, "assets").is_err());
+        assert!(copy_external(&root, &outside, "assets").is_err());
+        assert!(copy_external(&root, &source, "../escape").is_err());
+        assert!(copy_external(&root, &source, "/tmp").is_err());
+        assert!(copy_external(&root, &outside.join("missing"), "assets").is_err());
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(outside).unwrap();
+    }
+    #[test]
+    fn reads_image_bytes_with_a_size_limit() {
+        let root = fixture();
+        fs::write(root.join("icon.SVG"), b"<svg/>").unwrap();
+        let image = image_data(&root, "icon.SVG").unwrap();
+        assert_eq!(image.mime, "image/svg+xml");
+        assert_eq!(image.size, 6);
+        assert_eq!(image.bytes, b"<svg/>");
+        fs::write(root.join("text.txt"), b"text").unwrap();
+        assert_eq!(image_data(&root, "text.txt").unwrap_err().code, "IMAGE");
+        fs::File::create(root.join("large.png"))
+            .unwrap()
+            .set_len(MAX_FILE_SIZE + 1)
+            .unwrap();
+        assert_eq!(
+            image_data(&root, "large.png").unwrap_err().code,
+            "LARGE_FILE"
+        );
+        assert!(image_data(&root, "../outside.png").is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[cfg(unix)]
+    #[test]
+    fn rejects_image_and_import_symlink_escapes() {
+        let root = fixture();
+        let outside = fixture();
+        fs::write(outside.join("image.png"), b"image").unwrap();
+        std::os::unix::fs::symlink(&outside, root.join("outside")).unwrap();
+        assert!(image_data(&root, "outside/image.png").is_err());
+        assert!(copy_external(&root, &outside.join("image.png"), "outside").is_err());
+        std::os::unix::fs::symlink(outside.join("image.png"), outside.join("link.png")).unwrap();
+        assert!(copy_external(&root, &outside.join("link.png"), "").is_err());
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(outside).unwrap();
+    }
+    #[test]
+    fn opens_existing_project_paths_and_rejects_missing_or_file_paths() {
+        let root = fixture();
+        fs::create_dir(root.join("žluťoučký project")).unwrap();
+        assert_eq!(
+            project_directory(&root.join("žluťoučký project")).unwrap(),
+            root.join("žluťoučký project").canonicalize().unwrap()
+        );
+        fs::write(root.join("file.txt"), b"file").unwrap();
+        assert!(project_directory(&root.join("file.txt")).is_err());
+        assert!(project_directory(&root.join("missing")).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 }

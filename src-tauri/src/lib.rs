@@ -13,6 +13,7 @@ mod themes;
 pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(filesystem::Workspace::default())
         .manage(terminal::TerminalState::default())
         .manage(live_server::LiveState::default())
@@ -36,6 +37,9 @@ pub fn run() {
         filesystem::open_project,
         filesystem::list_directory,
         filesystem::read_file,
+        filesystem::read_image,
+        filesystem::import_files,
+        filesystem::copy_entry_path,
         filesystem::save_file,
         filesystem::create_entry,
         filesystem::rename_entry,
@@ -65,6 +69,9 @@ pub fn run() {
             filesystem::open_project,
             filesystem::list_directory,
             filesystem::read_file,
+            filesystem::read_image,
+            filesystem::import_files,
+            filesystem::copy_entry_path,
             filesystem::save_file,
             filesystem::create_entry,
             filesystem::rename_entry,
@@ -83,7 +90,14 @@ pub fn run() {
         ])
         .on_page_load(|webview, payload| {
             if payload.event() == tauri::webview::PageLoadEvent::Finished {
-                let _ = webview.eval(include_str!("../../scripts/native-smoke.js"));
+                let script = if std::env::var_os("MIDE_SMOKE_DRAG").is_some() {
+                    include_str!("../../scripts/native-drag-smoke.js")
+                } else if std::env::var_os("MIDE_SMOKE_UPGRADE").is_some() {
+                    include_str!("../../scripts/native-upgrade-smoke.js")
+                } else {
+                    include_str!("../../scripts/native-smoke.js")
+                };
+                let _ = webview.eval(script);
             }
         });
     builder

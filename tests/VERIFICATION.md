@@ -37,3 +37,24 @@ About: native smoke checks version/author/purpose, source address and full MIT l
 Search: Rust tests verify Unicode UTF-16 columns, literal case-insensitive matching, result limits, unsaved overlays, skipped binaries/dependencies and symlinks. Native smoke checks live document counts (including zero and edits), project shortcut/menu, cross-file count, unsaved content and exact selected match navigation.
 
 MDX: a mixed fixture covers frontmatter, ESM, expressions, nested JSX/components/fragments, Markdown markup and web code fences. Tests check syntax tokens, edits/unfinished JSX and absence of completion data. Native smoke checks lazy loading in WebKitGTK, actual colored tokens, theme changes and the file icon.
+
+## Explorer and image upgrade checks
+
+`tests/previews.test.ts` checks source-relative/root-relative image resolution, project escapes, HTML/Astro/JSX/TSX/MDX syntax, comments, fenced/inline code, dynamic expressions, favicons, multiple images and edits. `tests/image-loading.test.ts` checks shared loads, bounded concurrency/cache, refresh invalidation and retries. Rust filesystem tests cover moves, collisions, regular-file imports, unchanged sources, symlink boundaries and image size limits.
+
+For a browser integration pass, start `npm run dev`, then run `node scripts/upgrade-smoke.cjs` with Playwright available. `PLAYWRIGHT_MODULE` may point at an existing Playwright installation, and `MIDE_TEST_BROWSER` may point at Chromium. The script uses mocked Tauri commands; it checks pointer moves, unsaved buffer preservation, native drop coordinates at 150% scale, image/source tabs, tooltip links, independent preferences, gutter alignment, Dark/Light and a 600×400 window. Screenshots are written to `/tmp/mide-upgrade-*.png`. This does not replace OS drag-and-drop testing.
+
+For the real native upgrade test, create a fresh `/tmp/mide-upgrade-project` containing any text file and a small SVG at `/tmp/mide-upgrade-external.svg`. Build with `VITE_NATIVE_SMOKE=1 npm run tauri build -- --no-bundle --debug --features smoke-test`, then run:
+
+```sh
+MIDE_SMOKE_UPGRADE=1 MIDE_SMOKE_PROJECT=/tmp/mide-upgrade-project src-tauri/target/debug/mide
+cat /tmp/mide-native-report.txt
+```
+
+The test writes only its temporary project, verifies WebKit image decoding, gutter alignment/counts, image/source tabs, native clipboard writes, moves with unsaved text, preferences and real batch imports. Use a fresh fixture directory for every run. Manually verify OS file-manager drops and clipboard behavior on Linux, macOS and Windows before release.
+
+Local upgrade verification (2026-10-25): 111 frontend tests and 37 Rust tests passed. Clippy passed with all targets/features and warnings denied; Rust formatting and TypeScript checks passed. The browser integration scenario passed with Dark/Light, 150% display scale and the smallest supported window. All 12 native upgrade checks passed in Linux WebKitGTK, including real clipboard writes and batch imports. A normal desktop build was restored after the smoke run. Native file-manager drag delivery and macOS/Windows still require manual platform verification.
+
+Explorer drag regression: rows explicitly capture the pressed pointer, prevent native drag/selection, and release capture on drop/cancellation. Browser smoke asserts capture and cancelled `dragstart`, in addition to the resulting move. `scripts/native-drag-smoke.js` can be selected with `MIDE_SMOKE_DRAG=1 MIDE_SMOKE_KEEP_OPEN=1` in a smoke build. Give it a fresh fixture containing `drag.txt`, `destination/` and `folder/child.txt`; drag the file, then the folder, into destination. The report in `/tmp/mide-native-report.txt` records phases and pointer events, ending in `done` after verifying both filesystem moves. Actual X11 mouse input passed both moves in Linux WebKitGTK at devicePixelRatio 2 during the fix. This exercises dragging directly rather than the Move to… menu.
+
+Recent projects: parser/order tests cover deduplication, ten-entry retention, updated names, Unicode, Windows/UNC paths and damaged local storage. Browser integration checks persistence after reload, direct opening without a chooser, removal persistence and a missing folder leaving the start page intact. Rust checks existing Unicode/spaced directories, missing paths and file paths. Local verification passed 116 frontend tests, 38 Rust tests, TypeScript, all-feature Clippy and the browser scenario.

@@ -1,3 +1,4 @@
+import { registerMdxReferences } from "./image-references";
 import { html } from "@codemirror/lang-html";
 import { css } from "@codemirror/lang-css";
 import { javascript } from "@codemirror/lang-javascript";
@@ -8,8 +9,11 @@ import type { Extension } from "@codemirror/state";
 
 let mdx: Extension | undefined;
 export async function prepareLanguage(path: string): Promise<void> {
-  if (path.split(".").pop()?.toLowerCase() === "mdx" && !mdx)
-    mdx = (await import("./mdx")).mdxLanguage;
+  if (path.split(".").pop()?.toLowerCase() === "mdx" && !mdx) {
+    const module = await import("./mdx");
+    mdx = module.mdxLanguage;
+    registerMdxReferences(module.mdxMarkupRanges);
+  }
 }
 
 export function languageFor(path: string): Extension {

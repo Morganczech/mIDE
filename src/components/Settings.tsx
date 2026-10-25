@@ -1,4 +1,10 @@
-import { parseTheme, swatchColors, themeId, type CustomTheme } from "../lib/themes";
+import { preferenceLabels, type ImagePreferences } from "../lib/images";
+import {
+  parseTheme,
+  swatchColors,
+  themeId,
+  type CustomTheme,
+} from "../lib/themes";
 import { builtinThemes } from "../lib/builtin-themes";
 import { filterLibrary, type OmarchyVariant } from "../lib/omarchy-theme";
 import { useEffect, useRef, useState } from "react";
@@ -76,6 +82,8 @@ function FontPicker({
 }
 
 export function Settings({
+  imagePreferences,
+  setImagePreferences,
   theme,
   setTheme,
   customThemes,
@@ -96,6 +104,8 @@ export function Settings({
   setFontSize,
   close,
 }: {
+  imagePreferences: ImagePreferences;
+  setImagePreferences: (value: ImagePreferences) => void;
   theme: string;
   setTheme: (theme: string) => void;
   customThemes: CustomTheme[];
@@ -219,8 +229,7 @@ export function Settings({
   ];
   const visible = filterLibrary(library, themeQuery, themeFilter);
   const selected = library.find((item) => item.id === theme) ?? library[0];
-  const currentName =
-    follow && omarchyName ? omarchyName : selected.name;
+  const currentName = follow && omarchyName ? omarchyName : selected.name;
   const currentDots =
     follow && omarchyTheme
       ? swatchColors("palette", omarchyTheme.variant, omarchyTheme.colors)
@@ -236,6 +245,32 @@ export function Settings({
             Back to Editor <kbd>Esc</kbd>
           </button>
         </header>
+        <section
+          className="settings-section"
+          aria-labelledby="preview-settings-title"
+        >
+          <h2 id="preview-settings-title">Previews and documentation</h2>
+          {(Object.keys(preferenceLabels) as (keyof ImagePreferences)[]).map(
+            (key) => (
+              <div className="settings-row" key={key}>
+                <label htmlFor={`preference-${key}`}>
+                  {preferenceLabels[key]}
+                </label>
+                <input
+                  id={`preference-${key}`}
+                  type="checkbox"
+                  checked={imagePreferences[key]}
+                  onChange={(event) =>
+                    setImagePreferences({
+                      ...imagePreferences,
+                      [key]: event.target.checked,
+                    })
+                  }
+                />
+              </div>
+            ),
+          )}
+        </section>
         <section
           className="settings-section"
           aria-labelledby="text-settings-title"

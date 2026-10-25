@@ -22,12 +22,13 @@ export function Tabs({
           <button
             role="tab"
             aria-selected={active === doc.id}
-            aria-controls="editor-host"
-            title={doc.path}
+            aria-controls={doc.kind === "image" ? "image-host" : "editor-host"}
+            title={doc.path + (doc.kind === "image" ? " (image preview)" : "")}
             onClick={() => select(doc.id)}
           >
             <FileIcon path={doc.path} />
             <span className="tab-filename">{doc.path.split("/").pop()}</span>
+            {doc.kind === "image" && <span className="tab-kind">Preview</span>}
             {isDirty(doc) && (
               <span className="dirty" aria-label="Unsaved changes" />
             )}

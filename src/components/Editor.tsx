@@ -1,17 +1,23 @@
+import { previewExtensions } from "../editor/previews";
+import type { ImagePreferences } from "../lib/images";
 import { useLayoutEffect, type MutableRefObject } from "react";
 import { EditorView } from "@codemirror/view";
 import { fontStack } from "../lib/appearance";
-import { editorFontSize } from "../editor/config";
-import type { OpenDocument } from "../lib/documents";
+import { editorFontSize, editorPreviews } from "../editor/config";
+import type { TextDocument } from "../lib/documents";
 
 export function Editor({
+  imagePreferences,
+  version,
   document,
   fontSize,
   fontFamily,
   viewRef,
   changed,
 }: {
-  document: OpenDocument;
+  imagePreferences: ImagePreferences;
+  version: number;
+  document: TextDocument;
   fontSize: number;
   fontFamily: string;
   viewRef: MutableRefObject<EditorView | null>;
@@ -59,5 +65,12 @@ export function Editor({
       ),
     });
   }, [fontSize, fontFamily, document.id]);
+  useLayoutEffect(() => {
+    viewRef.current?.dispatch({
+      effects: editorPreviews.reconfigure(
+        previewExtensions(document.path, imagePreferences),
+      ),
+    });
+  }, [document.id, document.path, version, imagePreferences]);
   return <div id="editor-host" className="editor-host" />;
 }

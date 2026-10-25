@@ -1,3 +1,4 @@
+import type { Text } from "@codemirror/state";
 import { StreamLanguage } from "@codemirror/language";
 import {
   Registry,
@@ -135,3 +136,56 @@ export const mdxLanguage = StreamLanguage.define<MDXState>({
     return mdxTokenStyle(token.scopes);
   },
 });
+
+// Preserve TextMate's context so code fences, inline code and comments never
+// become image references merely because they contain HTML-looking text.
+interface MarkupCache {
+  line: number;
+  stack: StateStack | null;
+  start: number | null;
+  ranges: { from: number; to: number }[];
+}
+const markupCache = new WeakMap<Text, MarkupCache>();
+export function mdxMarkupRanges(
+  doc: Text,
+  to: number,
+): { from: number; to: number }[] {
+  let cache = markupCache.get(doc);
+  if (!cache) {
+    cache = { line: 1, stack: null, start: null, ranges: [] };
+    markupCache.set(doc, cache);
+  }
+  const lastLine = doc.lineAt(to).number;
+  while (
+    cache.line <= doc.lines &&
+    (cache.line <= lastLine || cache.start !== null)
+  ) {
+    const line = doc.line(cache.line++);
+    const result = grammar.tokenizeLine(line.text, cache.stack);
+    cache.stack = result.ruleStack;
+    for (const token of result.tokens) {
+      if (
+        token.scopes.some((scope) =>
+          /comment|markup\.(?:code|raw|inline)/.test(scope),
+        )
+      )
+        continue;
+      if (
+        !token.scopes.some(
+          (scope) => scope === "punctuation.definition.tag.end.jsx",
+        )
+      )
+        continue;
+      const value = line.text.slice(token.startIndex, token.endIndex);
+      if (value === "<") cache.start = line.from + token.startIndex;
+      if (value === ">" && cache.start !== null) {
+        cache.ranges.push({
+          from: cache.start,
+          to: line.from + token.endIndex,
+        });
+        cache.start = null;
+      }
+    }
+  }
+  return cache.ranges;
+}

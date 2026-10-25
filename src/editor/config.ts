@@ -28,6 +28,7 @@ import { languageFor } from "./languages";
 import { expandLorem } from "./lorem";
 
 export const editorFontSize = new Compartment();
+export const editorPreviews = new Compartment();
 
 export const syntaxStyle = HighlightStyle.define([
   { tag: [tags.keyword, tags.modifier], color: "var(--syntax-keyword)" },
@@ -62,6 +63,7 @@ export function createEditorState(
       editorFontSize.of(EditorView.theme({ "&": { fontSize: "14px" } })),
       findExtensions,
       lineNumbers(),
+      editorPreviews.of([]),
       highlightActiveLine(),
       highlightActiveLineGutter(),
       highlightSpecialChars(),

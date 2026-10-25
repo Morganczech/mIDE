@@ -66,6 +66,12 @@ export function FileIcon({
         ) : (
           <path d="M2 13V3.5h4l1.5 1.5H14v8z" />
         )
+      ) : /\.(png|jpe?g|gif|webp|avif|svg|ico)$/i.test(path) ? (
+        <>
+          <rect x="2" y="2" width="12" height="12" rx="1" />
+          <circle cx="5.5" cy="5.5" r="1" />
+          <path d="m2 12 4-4 3 3 2-2 3 3" />
+        </>
       ) : (
         <path d="M3.5 1.5h5l4 4v9h-9zM8.5 1.5v4h4" />
       )}
