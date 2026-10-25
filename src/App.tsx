@@ -133,6 +133,9 @@ export default function App() {
       ? stored
       : 14;
   });
+  const [autoSave, setAutoSave] = useState(
+    () => localStorage.getItem("mide-autosave") !== "false",
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const openSources = () => {
@@ -181,6 +184,7 @@ export default function App() {
   const currentActions = useRef({
     openFolder: async () => {},
     save: async () => {},
+    autoSave: async () => {},
     close: async () => {},
     next: () => {},
     format: async () => {},
@@ -673,6 +677,12 @@ export default function App() {
       run(async () => {
         if (active) await save(active);
       }),
+    autoSave: () =>
+      run(async () => {
+        for (const doc of documents.current) {
+          if (isDirty(doc)) await save(doc);
+        }
+      }),
     close: () => (active ? closeTab(active.id) : Promise.resolve()),
     next: () => {
       const docs = documents.current;
@@ -684,6 +694,46 @@ export default function App() {
     },
   };
   useEffect(() => {
+    localStorage.setItem("mide-autosave", String(autoSave));
+    if (!autoSave) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const flush = () => {
+      // Let a click finish first; wait for moves, formatting and dialogs.
+      if (busyRef.current || window.document.querySelector("dialog[open]")) {
+        timer = setTimeout(flush, 100);
+        return;
+      }
+      timer = undefined;
+      if (documents.current.some(isDirty))
+        void currentActions.current.autoSave();
+    };
+    const schedule = () => {
+      clearTimeout(timer);
+      timer = setTimeout(flush, 0);
+    };
+    const outsideEditor = (event: FocusEvent | PointerEvent) => {
+      const host = window.document.getElementById("editor-host");
+      if (!host) return;
+      if (event.type === "pointerdown") {
+        if (!host.contains(event.target as Node)) schedule();
+      } else if (
+        host.contains(event.target as Node) &&
+        !host.contains((event as FocusEvent).relatedTarget as Node | null)
+      ) {
+        schedule();
+      }
+    };
+    window.addEventListener("pointerdown", outsideEditor, true);
+    window.addEventListener("focusout", outsideEditor, true);
+    window.addEventListener("blur", schedule);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pointerdown", outsideEditor, true);
+      window.removeEventListener("focusout", outsideEditor, true);
+      window.removeEventListener("blur", schedule);
+    };
+  }, [autoSave]);
+  useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if (
         event.isComposing ||
@@ -693,6 +743,20 @@ export default function App() {
         projectSearchOpen
       )
         return;
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.altKey &&
+        !event.shiftKey &&
+        !event.getModifierState("AltGraph") &&
+        (event.code === "KeyS" || event.key.toLowerCase() === "s") &&
+        !shortcutsOpen
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (sourcesOpen) closeSources();
+        else openSources();
+        return;
+      }
       if (sourcesOpen) {
         if (
           (event.metaKey || event.ctrlKey) &&
@@ -902,6 +966,8 @@ export default function App() {
         {sourcesOpen && <Sources close={closeSources} />}
         {settingsOpen && (
           <Settings
+            autoSave={autoSave}
+            setAutoSave={setAutoSave}
             imagePreferences={imagePreferences}
             setImagePreferences={setImagePreferences}
             theme={theme}

@@ -4,7 +4,7 @@
 
 It provides the essentials for editing HTML, CSS, JavaScript, TypeScript, React and Astro. It deliberately leaves out code suggestions, automatic completion, auto-closing tags and brackets, AI assistants and language servers. The goal is to give learners a comfortable place to practice writing and understanding their own code.
 
-Designed for Linux, macOS and Windows. The current version is **0.3.0**; Linux is the primary development and verification platform.
+Designed for Linux, macOS and Windows. The current version is **0.4.0**; Linux is the primary development and verification platform.
 
 Tauri 2 · Rust · React · TypeScript · Vite · CodeMirror 6
 
@@ -58,6 +58,7 @@ The menu provides Open Folder, Save, Find, Format Document, Toggle Terminal, Set
 | --- | --- | --- |
 | Open Folder | Ctrl+O | Cmd+O |
 | Save | Ctrl+S | Cmd+S |
+| Toggle Sources | Ctrl+Alt+S | Cmd+Alt+S |
 | Find | Ctrl+F | Cmd+F |
 | Find in Project | Ctrl+Alt+F | Cmd+Alt+F |
 | Format Document | Ctrl+Shift+F | Cmd+Shift+F |
@@ -76,7 +77,7 @@ Open **Menu → Keyboard Shortcuts** (or press **F1**) to see the shortcut refer
 
 HTML, CSS, JavaScript, TypeScript, JSX, TSX, Astro, JSON, Markdown and MDX have syntax highlighting. Other UTF-8 files open as plain text. Text files over 16 MiB, other binary files and invalid UTF-8 are rejected. UTF-8 BOM and LF/CRLF are preserved. Names and paths support Unicode. Paths through symlinks outside the selected project cannot be opened or edited; deleting a link deletes the link itself.
 
-Formatting is explicit, uses the shipped pinned Prettier and Astro plugin, makes one undoable edit and does not save. Project Prettier configs/plugins are intentionally not executed. No format-on-save or autosave. Theme, interface/editor font families and editor text size (10–32px, default 14px) are persisted preferences; project and open-file sessions are not restored.
+Formatting is explicit, uses the shipped pinned Prettier and Astro plugin, makes one undoable edit and does not save. Project Prettier configs/plugins are intentionally not executed. No format-on-save. Auto Save is enabled by default and saves changed open files when focus leaves the editor (including switching apps). Turn it off in Settings to save manually. Conflicts and failed writes keep files marked as unsaved. Theme, interface/editor font families and editor text size (10–32px, default 14px) are persisted preferences; project and open-file sessions are not restored.
 
 There is no AI, autocomplete, LSP, diagnostics, auto-closing tags/brackets, debugger, Git UI, documentation viewer, telemetry, account or extension system. Git runs in the terminal. Documentation belongs in your browser.
 

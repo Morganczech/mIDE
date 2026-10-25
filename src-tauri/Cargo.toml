@@ -1,6 +1,6 @@
 [package]
 name = "mide"
-version = "0.3.0"
+version = "0.4.0"
 description = "A quiet editor for learning web programming"
 edition = "2021"
 license = "MIT"

@@ -17,6 +17,7 @@ const shortcuts = [
   ["Increase Editor Text", `${modifierKey} + + (or ${modifierKey} + =)`],
   ["Decrease Editor Text", `${modifierKey} + −`],
   ["Reset Editor Text", `${modifierKey} + 0`],
+  ["Toggle Sources", `${modifierKey} + Alt + S`],
   ["Settings", `${modifierKey} + ,`],
   ["Keyboard Shortcuts", "F1"],
 ];

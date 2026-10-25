@@ -102,6 +102,8 @@ const assert = require("node:assert/strict");
           return;
         }
         if (command === "save_file") {
+          if (window.__mock.failSave)
+            throw new Error("Cannot save: file changed on disk");
           files[args.path] = args.text;
           return "2";
         }
@@ -116,6 +118,77 @@ const assert = require("node:assert/strict");
   await page.goto(process.env.MIDE_TEST_URL || "http://127.0.0.1:1420");
   await page.getByRole("button", { name: "Open Folder" }).click();
   await page.getByRole("treeitem", { name: "index.html" }).click();
+  // Auto Save waits for leaving the editor; Sources is keyboard accessible.
+  const original = await page.locator(".cm-content").innerText();
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type("<!-- autosave -->");
+  assert.equal(
+    await page.evaluate(
+      () => window.__mock.calls.filter((c) => c.command === "save_file").length,
+    ),
+    0,
+  );
+  await page.getByRole("treeitem", { name: "assets" }).click();
+  await page.waitForFunction(() =>
+    window.__mock.files["index.html"].includes("autosave"),
+  );
+  await page.evaluate(() => {
+    window.__mock.failSave = true;
+  });
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type("<!-- conflict -->");
+  await page.getByRole("treeitem", { name: "assets" }).click();
+  await page
+    .getByRole("alert")
+    .filter({ hasText: "file changed on disk" })
+    .waitFor();
+  assert(await page.locator(".dirty").isVisible());
+  assert((await page.locator(".cm-content").innerText()).includes("conflict"));
+  assert(
+    !(await page.evaluate(() => window.__mock.files["index.html"])).includes(
+      "conflict",
+    ),
+  );
+  await page.evaluate(() => {
+    window.__mock.failSave = false;
+  });
+  await page.getByRole("button", { name: "Dismiss error" }).click();
+  await page.waitForFunction(() =>
+    window.__mock.files["index.html"].includes("conflict"),
+  );
+  await page.keyboard.press("Control+Alt+s");
+  await page.getByRole("heading", { name: "Sources", exact: true }).waitFor();
+  await page.keyboard.press("Control+Alt+s");
+  await page
+    .getByRole("heading", { name: "Sources", exact: true })
+    .waitFor({ state: "hidden" });
+  await page.keyboard.press("Control+,");
+  await page
+    .getByRole("checkbox", { name: "Auto Save on leaving the editor" })
+    .uncheck();
+  await page.getByRole("button", { name: "Back to Editor" }).click();
+  await page.locator(".cm-content").fill(original);
+  await page.keyboard.press("Control+s");
+  await page.waitForFunction(
+    () => !window.__mock.files["index.html"].includes("autosave"),
+  );
+  const saves = await page.evaluate(
+    () => window.__mock.calls.filter((c) => c.command === "save_file").length,
+  );
+  await page.keyboard.press("Control+End");
+  await page.keyboard.type("<!-- manual -->");
+  await page.getByRole("treeitem", { name: "assets" }).click();
+  await page.waitForTimeout(150);
+  assert.equal(
+    await page.evaluate(
+      () => window.__mock.calls.filter((c) => c.command === "save_file").length,
+    ),
+    saves,
+  );
+  await page.locator(".cm-content").fill(original);
+  await page.keyboard.press("Control+s");
   await page.locator(".image-gutter-marker").waitFor();
   assert.equal(await page.locator(".image-gutter-marker").count(), 1);
   assert.equal(
@@ -282,7 +355,7 @@ const assert = require("node:assert/strict");
   );
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("menuitem", { name: /^Settings/ }).click();
-  assert.equal(await page.getByRole("checkbox").count(), 4); // Independent image, HTML and CSS preferences.
+  assert.equal(await page.getByRole("checkbox").count(), 5); // Independent image, HTML and CSS preferences.
   await page
     .getByLabel("Image thumbnails in gutter", { exact: true })
     .uncheck();

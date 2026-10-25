@@ -82,6 +82,8 @@ function FontPicker({
 }
 
 export function Settings({
+  autoSave,
+  setAutoSave,
   imagePreferences,
   setImagePreferences,
   theme,
@@ -104,6 +106,8 @@ export function Settings({
   setFontSize,
   close,
 }: {
+  autoSave: boolean;
+  setAutoSave: (value: boolean) => void;
   imagePreferences: ImagePreferences;
   setImagePreferences: (value: ImagePreferences) => void;
   theme: string;
@@ -245,6 +249,25 @@ export function Settings({
             Back to Editor <kbd>Esc</kbd>
           </button>
         </header>
+        <section
+          className="settings-section"
+          aria-labelledby="saving-settings-title"
+        >
+          <h2 id="saving-settings-title">Saving</h2>
+          <div className="settings-row">
+            <label htmlFor="autosave">Auto Save on leaving the editor</label>
+            <input
+              id="autosave"
+              type="checkbox"
+              checked={autoSave}
+              onChange={(event) => setAutoSave(event.target.checked)}
+            />
+          </div>
+          <p className="settings-note">
+            Save changed open files when focus moves outside the editor or the
+            app.
+          </p>
+        </section>
         <section
           className="settings-section"
           aria-labelledby="preview-settings-title"
