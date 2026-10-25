@@ -328,26 +328,38 @@ export default function App() {
       changed();
     });
   const fileAction = (action: FileAction, entry: Entry | null) => {
-    if (action === "browser" && liveBusy.current) return;
-    return run(async () => {
-      if (action === "browser") {
-        if (liveBusy.current) return;
-        liveBusy.current = true;
+    if (action === "browser") {
+      if (liveBusy.current) return;
+      liveBusy.current = true;
+      const task = (async () => {
         try {
           if (liveRef.current) {
             await backend.liveServerOpen();
           } else {
             const info = await backend.liveServerStart();
+            if (liveSwitching.current) {
+              liveRef.current = { port: info.port, url: info.url };
+              await backend.liveServerStop();
+              return;
+            }
             const status = startedStatus(info);
             setLiveNow({ port: info.port, url: info.url });
             setLiveMessage(status.message);
             setError(status.error);
           }
+        } catch (caught) {
+          setError(errorMessage(caught));
         } finally {
-          liveBusy.current = false;
+          if (!liveSwitching.current) liveBusy.current = false;
         }
-        return;
-      }
+      })();
+      liveTask.current = task;
+      void task.finally(() => {
+        if (liveTask.current === task) liveTask.current = null;
+      });
+      return;
+    }
+    return run(async () => {
       if (action === "refresh") {
         setVersion((v) => v + 1);
         return;
