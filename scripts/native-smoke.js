@@ -795,7 +795,7 @@
     check(
       about.textContent.includes("minimal IDE") &&
         about.textContent.includes("Morganczech") &&
-        about.querySelector(".about-version").textContent === "0.1.0",
+        about.querySelector(".about-version").textContent === "0.3.0",
       "About contains app version, purpose and author",
     );
     check(

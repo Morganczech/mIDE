@@ -8,10 +8,7 @@ import {
   type CustomTheme,
 } from "./lib/themes";
 import { builtinThemes, themeLabel } from "./lib/builtin-themes";
-import {
-  mapOmarchyTheme,
-  type OmarchyVariant,
-} from "./lib/omarchy-theme";
+import { mapOmarchyTheme, type OmarchyVariant } from "./lib/omarchy-theme";
 import {
   lazy,
   Suspense,
@@ -27,6 +24,7 @@ import { listen } from "@tauri-apps/api/event";
 import { EditorView } from "@codemirror/view";
 import { Explorer, type FileAction } from "./components/Explorer";
 import { Tabs } from "./components/Tabs";
+import { Sources } from "./components/Sources";
 import { Settings } from "./components/Settings";
 import { normalizeFont, fontStack } from "./lib/appearance";
 import { Editor } from "./components/Editor";
@@ -114,6 +112,22 @@ export default function App() {
       : 14;
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const openSources = () => {
+    setSettingsOpen(false);
+    setSourcesOpen(true);
+    setMenu(false);
+  };
+  const closeSources = () => {
+    setSourcesOpen(false);
+    requestAnimationFrame(() => {
+      view.current?.requestMeasure();
+      view.current?.focus();
+      document
+        .querySelector<HTMLButtonElement>(".empty-actions button")
+        ?.focus();
+    });
+  };
   const [interfaceFont, setInterfaceFont] = useState(() =>
     normalizeFont(localStorage.getItem("mide-interface-font") ?? ""),
   );
@@ -450,12 +464,7 @@ export default function App() {
   useLayoutEffect(() => {
     if (follow && omarchyTheme) applyPalette(omarchyTheme);
     else
-      applyTheme(
-        theme,
-        customThemes,
-        document.documentElement,
-        builtinThemes,
-      );
+      applyTheme(theme, customThemes, document.documentElement, builtinThemes);
     if (!follow) localStorage.setItem("mide-theme", theme);
   }, [follow, omarchyTheme, theme, customThemes]);
   useEffect(() => {
@@ -597,6 +606,22 @@ export default function App() {
   useEffect(() => {
     const keydown = (event: KeyboardEvent) => {
       if (event.isComposing || dialog || aboutOpen || projectSearchOpen) return;
+      if (sourcesOpen) {
+        if (
+          (event.metaKey || event.ctrlKey) &&
+          ["s", "o", "j", "w", "f", "enter", ",", "tab"].includes(
+            event.key.toLowerCase(),
+          )
+        ) {
+          event.preventDefault();
+          if (event.key.toLowerCase() === "w") closeSources();
+          if (event.key === ",") {
+            setSourcesOpen(false);
+            setSettingsOpen(true);
+          }
+        }
+        return;
+      }
       if (event.key === "F1") {
         event.preventDefault();
         event.stopPropagation();
@@ -717,6 +742,7 @@ export default function App() {
     menu,
     shortcutsOpen,
     settingsOpen,
+    sourcesOpen,
     aboutOpen,
     projectSearchOpen,
     project,
@@ -755,7 +781,7 @@ export default function App() {
     : null;
   return (
     <div
-      className={`app ${project ? "has-project" : ""} ${focus ? "focus-mode" : ""} ${settingsOpen ? "settings-open" : ""}`}
+      className={`app ${project ? "has-project" : ""} ${focus ? "focus-mode" : ""} ${settingsOpen || sourcesOpen ? "settings-open" : ""}`}
       aria-busy={busy}
     >
       {project && (
@@ -770,6 +796,7 @@ export default function App() {
         />
       )}
       <main>
+        {sourcesOpen && <Sources close={closeSources} />}
         {settingsOpen && (
           <Settings
             theme={theme}
@@ -932,6 +959,9 @@ export default function App() {
                     <span>Settings</span>
                     <kbd>{modifierKey} + ,</kbd>
                   </button>
+                  <button role="menuitem" onClick={openSources}>
+                    Sources
+                  </button>
                   <button
                     role="menuitem"
                     onClick={() => {
@@ -978,7 +1008,10 @@ export default function App() {
         {liveMessage && (
           <div className="status-strip" role="status">
             <span>{liveMessage}</span>
-            <button aria-label="Dismiss status" onClick={() => setLiveMessage("")}>
+            <button
+              aria-label="Dismiss status"
+              onClick={() => setLiveMessage("")}
+            >
               Dismiss
             </button>
           </div>
@@ -1006,6 +1039,9 @@ export default function App() {
               >
                 Settings
               </button>
+              <button className="settings-link" onClick={openSources}>
+                Sources
+              </button>
               <button
                 className="settings-link"
                 onClick={() => setAboutOpen(true)}
@@ -1019,7 +1055,7 @@ export default function App() {
           <Suspense fallback={null}>
             <Terminal
               key={project.path}
-              visible={terminalOpen && !focus && !settingsOpen}
+              visible={terminalOpen && !focus && !settingsOpen && !sourcesOpen}
               theme={theme + JSON.stringify(customThemes)}
               fontFamily={fontStack(editorFont, "editor")}
               hide={() => {
@@ -1044,7 +1080,9 @@ export default function App() {
             </>
           )}
           <button
-            className={liveControl(live).running ? "live-server running" : "live-server"}
+            className={
+              liveControl(live).running ? "live-server running" : "live-server"
+            }
             aria-label={liveControl(live).name}
             onClick={() => void toggleLive()}
           >

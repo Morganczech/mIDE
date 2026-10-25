@@ -4,7 +4,7 @@
 
 It provides the essentials for editing HTML, CSS, JavaScript, TypeScript, React and Astro. It deliberately leaves out code suggestions, automatic completion, auto-closing tags and brackets, AI assistants and language servers. The goal is to give learners a comfortable place to practice writing and understanding their own code.
 
-Designed for Linux, macOS and Windows. The current version is **0.2.0**; Linux is the primary development and verification platform.
+Designed for Linux, macOS and Windows. The current version is **0.3.0**; Linux is the primary development and verification platform.
 
 Tauri 2 · Rust · React · TypeScript · Vite · CodeMirror 6
 
@@ -41,7 +41,7 @@ Open a folder, then click a file in the Explorer. Use the Explorer's plus button
 
 Go Live, at the trailing end of the status bar, serves the open folder at `http://127.0.0.1` on the first free port from 5500 through 5509 and opens that address in the system browser. The button then shows the port; click it again to stop. Saving a file reloads the open pages. The project-root `index.html` also has Open in Browser in its right-click menu. Switching projects or closing the window stops the server. Focus Mode hides the control and leaves the server running.
 
-The menu provides Open Folder, Save, Find, Format Document, Toggle Terminal, Settings, theme selection, Focus Mode and About mIDE. About shows the application version, purpose, author, repository address and MIT license. The current cursor line and its line number are subtly highlighted in both themes. Unsaved files show a small dot. Closing a changed tab, switching projects or closing the window asks whether to save, discard or cancel. Saving a file changed by another program reports a conflict; copy your changes if needed, close/discard the tab, and reopen the file before applying them again. The app never silently overwrites external changes.
+The menu provides Open Folder, Save, Find, Format Document, Toggle Terminal, Settings, Sources, theme selection, Focus Mode and About mIDE. About shows the application version, purpose, author, repository address and MIT license. The current cursor line and its line number are subtly highlighted in both themes. Unsaved files show a small dot. Closing a changed tab, switching projects or closing the window asks whether to save, discard or cancel. Saving a file changed by another program reports a conflict; copy your changes if needed, close/discard the tab, and reopen the file before applying them again. The app never silently overwrites external changes.
 
 | Action | Linux / Windows | macOS |
 | --- | --- | --- |
@@ -135,3 +135,9 @@ Project search skips `.git`, `node_modules`, `target`, `dist`, `build`, `.next`,
 ## MDX
 
 `.mdx` files have syntax highlighting and a Markdown file icon. The existing MDX TextMate grammar covers Markdown markup, YAML/TOML frontmatter, ESM imports/exports, JSX components and JavaScript expressions. Fenced HTML, CSS, JavaScript, TypeScript, JSX/TSX, JSON and Markdown blocks are supported; other fenced languages remain plain text. MDX grammars and the tokenizer are loaded only when the first MDX file is opened. Token scopes use mIDE's existing theme colors, including imported themes. No MDX code is compiled, executed, previewed or completed. Format Document support is currently unchanged; MDX formatting is not included in this highlighting change.
+
+## Sources
+
+Open Sources from the menu or start screen to browse 72 documentation, learning, tool and asset links. Search by name, domain or topic, filter by category, and star favorites. Links open in the system browser.
+
+Add and edit personal sources, hide or restore built-in entries, or save a built-in entry as your own. Collection offers JSON import (merge or replace) and export through native file dialogs. Your collection is stored locally across projects. See [Sources format and catalog maintenance](docs/sources.md).

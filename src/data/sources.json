@@ -1,0 +1,760 @@
+[
+  {
+    "id": "mdn-html",
+    "title": "MDN HTML",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/HTML",
+    "description": "Look up HTML elements, attributes and semantic page structure.",
+    "category": "Documentation",
+    "tags": [
+      "HTML"
+    ]
+  },
+  {
+    "id": "mdn-css",
+    "title": "MDN CSS",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/CSS",
+    "description": "Find CSS properties, selectors and layout references.",
+    "category": "Documentation",
+    "tags": [
+      "CSS"
+    ]
+  },
+  {
+    "id": "mdn-js",
+    "title": "MDN JavaScript",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/JavaScript",
+    "description": "Look up JavaScript syntax, built-in objects and examples.",
+    "category": "Documentation",
+    "tags": [
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "typescript",
+    "title": "TypeScript Handbook",
+    "url": "https://www.typescriptlang.org/docs/handbook/intro.html",
+    "description": "Learn types and how to describe JavaScript data safely.",
+    "category": "Documentation",
+    "tags": [
+      "TypeScript"
+    ]
+  },
+  {
+    "id": "react-jsx",
+    "title": "React: Writing JSX",
+    "url": "https://react.dev/learn/writing-markup-with-jsx",
+    "description": "Understand JSX markup used in React components and .jsx files.",
+    "category": "Documentation",
+    "tags": [
+      "JSX",
+      "React"
+    ]
+  },
+  {
+    "id": "react-ts",
+    "title": "React with TypeScript",
+    "url": "https://react.dev/learn/typescript",
+    "description": "Use typed props and components in React .tsx files.",
+    "category": "Documentation",
+    "tags": [
+      "TSX",
+      "TypeScript",
+      "React"
+    ]
+  },
+  {
+    "id": "astro",
+    "title": "Astro Docs",
+    "url": "https://docs.astro.build/en/getting-started/",
+    "description": "Build pages with Astro components, layouts and content.",
+    "category": "Documentation",
+    "tags": [
+      "Astro"
+    ]
+  },
+  {
+    "id": "json",
+    "title": "Introducing JSON",
+    "url": "https://www.json.org/json-en.html",
+    "description": "Understand JSON objects, arrays and valid data syntax.",
+    "category": "Documentation",
+    "tags": [
+      "JSON"
+    ]
+  },
+  {
+    "id": "commonmark",
+    "title": "CommonMark Help",
+    "url": "https://commonmark.org/help/",
+    "description": "Check Markdown syntax for headings, links, lists and code.",
+    "category": "Documentation",
+    "tags": [
+      "Markdown"
+    ]
+  },
+  {
+    "id": "mdx",
+    "title": "MDX Docs",
+    "url": "https://mdxjs.com/docs/",
+    "description": "Combine Markdown content with JSX components.",
+    "category": "Documentation",
+    "tags": [
+      "MDX",
+      "JSX"
+    ]
+  },
+  {
+    "id": "tailwind",
+    "title": "Tailwind CSS",
+    "url": "https://tailwindcss.com/docs",
+    "description": "Explore utility classes for styling web interfaces.",
+    "category": "Documentation",
+    "tags": [
+      "CSS",
+      "Tailwind"
+    ]
+  },
+  {
+    "id": "mdn-accessibility",
+    "title": "MDN Accessibility",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/Accessibility",
+    "description": "Make pages usable with keyboards and assistive technologies.",
+    "category": "Documentation",
+    "tags": [
+      "HTML",
+      "Accessibility"
+    ]
+  },
+  {
+    "id": "mdn-api",
+    "title": "MDN Web APIs",
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API",
+    "description": "Explore browser APIs such as DOM, events and fetch.",
+    "category": "Documentation",
+    "tags": [
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "astro-mdx",
+    "title": "Astro MDX integration",
+    "url": "https://docs.astro.build/en/guides/integrations-guide/mdx/",
+    "description": "Set up MDX content inside an Astro project.",
+    "category": "Documentation",
+    "tags": [
+      "Astro",
+      "MDX"
+    ]
+  },
+  {
+    "id": "mdn-learn",
+    "title": "MDN Learn",
+    "url": "https://developer.mozilla.org/en-US/docs/Learn_web_development",
+    "description": "Follow a structured introduction to building websites.",
+    "category": "Learning & Articles",
+    "tags": [
+      "HTML",
+      "CSS",
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "javascript-info",
+    "title": "The Modern JavaScript Tutorial",
+    "url": "https://javascript.info/",
+    "description": "Study JavaScript concepts with explanations and exercises.",
+    "category": "Learning & Articles",
+    "tags": [
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "css-tricks",
+    "title": "CSS-Tricks",
+    "url": "https://css-tricks.com/",
+    "description": "Read practical articles about CSS techniques and layouts.",
+    "category": "Learning & Articles",
+    "tags": [
+      "CSS"
+    ]
+  },
+  {
+    "id": "webdev-learn",
+    "title": "web.dev Learn",
+    "url": "https://web.dev/learn",
+    "description": "Work through courses on CSS, accessibility and web fundamentals.",
+    "category": "Learning & Articles",
+    "tags": [
+      "CSS",
+      "HTML"
+    ]
+  },
+  {
+    "id": "odin",
+    "title": "The Odin Project",
+    "url": "https://www.theodinproject.com/",
+    "description": "Follow a project-based web development curriculum.",
+    "category": "Learning & Articles",
+    "tags": [
+      "HTML",
+      "CSS",
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "freecodecamp",
+    "title": "freeCodeCamp",
+    "url": "https://www.freecodecamp.org/learn/",
+    "description": "Practice programming through guided lessons and projects.",
+    "category": "Learning & Articles",
+    "tags": [
+      "HTML",
+      "CSS",
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "flexbox-froggy",
+    "title": "Flexbox Froggy",
+    "url": "https://flexboxfroggy.com/",
+    "description": "Practice CSS flexbox by moving frogs onto lily pads.",
+    "category": "Learning & Articles",
+    "tags": [
+      "CSS",
+      "Flexbox"
+    ]
+  },
+  {
+    "id": "grid-garden",
+    "title": "Grid Garden",
+    "url": "https://cssgridgarden.com/",
+    "description": "Practice CSS grid by watering a virtual garden.",
+    "category": "Learning & Articles",
+    "tags": [
+      "CSS",
+      "Grid"
+    ]
+  },
+  {
+    "id": "astro-tutorial",
+    "title": "Astro Tutorial",
+    "url": "https://docs.astro.build/en/tutorial/0-introduction/",
+    "description": "Build a first Astro blog step by step.",
+    "category": "Learning & Articles",
+    "tags": [
+      "Astro"
+    ]
+  },
+  {
+    "id": "react-learn",
+    "title": "React Learn",
+    "url": "https://react.dev/learn",
+    "description": "Learn components, state and rendering with React.",
+    "category": "Learning & Articles",
+    "tags": [
+      "JSX",
+      "TSX",
+      "React"
+    ]
+  },
+  {
+    "id": "caniuse",
+    "title": "Can I use",
+    "url": "https://caniuse.com/",
+    "description": "Check browser support before choosing a web feature.",
+    "category": "Tools",
+    "tags": [
+      "CSS",
+      "HTML",
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "validator",
+    "title": "W3C HTML Validator",
+    "url": "https://validator.w3.org/",
+    "description": "Check HTML markup for structural mistakes.",
+    "category": "Tools",
+    "tags": [
+      "HTML"
+    ]
+  },
+  {
+    "id": "css-validator",
+    "title": "W3C CSS Validator",
+    "url": "https://jigsaw.w3.org/css-validator/",
+    "description": "Check stylesheets for CSS syntax problems.",
+    "category": "Tools",
+    "tags": [
+      "CSS"
+    ]
+  },
+  {
+    "id": "jsonlint",
+    "title": "JSONLint",
+    "url": "https://jsonlint.com/",
+    "description": "Validate and format sample JSON; avoid pasting secrets.",
+    "category": "Tools",
+    "tags": [
+      "JSON"
+    ]
+  },
+  {
+    "id": "regex101",
+    "title": "regex101",
+    "url": "https://regex101.com/",
+    "description": "Explore regular expressions; select the JavaScript flavor.",
+    "category": "Tools",
+    "tags": [
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "codepen",
+    "title": "CodePen",
+    "url": "https://codepen.io/",
+    "description": "Experiment with small HTML, CSS and JavaScript examples. Some features are paid.",
+    "category": "Tools",
+    "tags": [
+      "HTML",
+      "CSS",
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "playground-ts",
+    "title": "TypeScript Playground",
+    "url": "https://www.typescriptlang.org/play",
+    "description": "Try TypeScript and inspect its JavaScript output.",
+    "category": "Tools",
+    "tags": [
+      "TypeScript"
+    ]
+  },
+  {
+    "id": "playground-tailwind",
+    "title": "Tailwind Play",
+    "url": "https://play.tailwindcss.com/",
+    "description": "Try Tailwind utilities in a browser sandbox.",
+    "category": "Tools",
+    "tags": [
+      "CSS",
+      "Tailwind"
+    ]
+  },
+  {
+    "id": "html-entities",
+    "title": "HTML Entity Reference",
+    "url": "https://html.spec.whatwg.org/multipage/named-characters.html",
+    "description": "Find named character references for HTML text.",
+    "category": "Tools",
+    "tags": [
+      "HTML"
+    ]
+  },
+  {
+    "id": "clippy",
+    "title": "Clippy",
+    "url": "https://bennettfeely.com/clippy/",
+    "description": "Create CSS clip-path shapes and copy the result.",
+    "category": "Tools",
+    "tags": [
+      "CSS"
+    ]
+  },
+  {
+    "id": "cubic-bezier",
+    "title": "cubic-bezier",
+    "url": "https://cubic-bezier.com/",
+    "description": "Preview and tune timing curves for CSS transitions.",
+    "category": "Tools",
+    "tags": [
+      "CSS"
+    ]
+  },
+  {
+    "id": "squoosh",
+    "title": "Squoosh",
+    "url": "https://squoosh.app/",
+    "description": "Compress project images and compare formats visually.",
+    "category": "Tools",
+    "tags": [
+      "Images"
+    ]
+  },
+  {
+    "id": "svgomg",
+    "title": "SVGOMG",
+    "url": "https://jakearchibald.github.io/svgomg/",
+    "description": "Optimize SVG files before adding them to a project.",
+    "category": "Tools",
+    "tags": [
+      "SVG"
+    ]
+  },
+  {
+    "id": "responsively",
+    "title": "Responsively App",
+    "url": "https://responsively.app/",
+    "description": "Explore a tool for previewing responsive layouts.",
+    "category": "Tools",
+    "tags": [
+      "Responsive"
+    ]
+  },
+  {
+    "id": "coolors",
+    "title": "Coolors",
+    "url": "https://coolors.co/",
+    "description": "Generate matching color palettes. Some features are paid.",
+    "category": "Colors & Gradients",
+    "tags": [
+      "Colors"
+    ]
+  },
+  {
+    "id": "adobe-color",
+    "title": "Adobe Color",
+    "url": "https://color.adobe.com/create/color-wheel",
+    "description": "Explore color harmonies using a color wheel.",
+    "category": "Colors & Gradients",
+    "tags": [
+      "Colors"
+    ]
+  },
+  {
+    "id": "colorhunt",
+    "title": "Color Hunt",
+    "url": "https://colorhunt.co/",
+    "description": "Browse ready-made palettes for visual inspiration.",
+    "category": "Colors & Gradients",
+    "tags": [
+      "Colors"
+    ]
+  },
+  {
+    "id": "cssgradient",
+    "title": "CSS Gradient",
+    "url": "https://cssgradient.io/",
+    "description": "Build a gradient and copy its CSS.",
+    "category": "Colors & Gradients",
+    "tags": [
+      "CSS",
+      "Gradients"
+    ]
+  },
+  {
+    "id": "uigradients",
+    "title": "uiGradients",
+    "url": "https://uigradients.com/",
+    "description": "Browse gradient combinations and their color values.",
+    "category": "Colors & Gradients",
+    "tags": [
+      "Gradients"
+    ]
+  },
+  {
+    "id": "contrast",
+    "title": "WebAIM Contrast Checker",
+    "url": "https://webaim.org/resources/contrastchecker/",
+    "description": "Check whether text and background colors have enough contrast.",
+    "category": "Colors & Gradients",
+    "tags": [
+      "Colors",
+      "Accessibility"
+    ]
+  },
+  {
+    "id": "oklch",
+    "title": "OKLCH Color Picker",
+    "url": "https://oklch.com/",
+    "description": "Explore perceptual color values for modern CSS.",
+    "category": "Colors & Gradients",
+    "tags": [
+      "CSS",
+      "Colors"
+    ]
+  },
+  {
+    "id": "happyhues",
+    "title": "Happy Hues",
+    "url": "https://www.happyhues.co/",
+    "description": "See color palettes applied to example web layouts.",
+    "category": "Colors & Gradients",
+    "tags": [
+      "Colors",
+      "Inspiration"
+    ]
+  },
+  {
+    "id": "google-fonts",
+    "title": "Google Fonts",
+    "url": "https://fonts.google.com/",
+    "description": "Find web fonts; check each font license before use.",
+    "category": "Fonts",
+    "tags": [
+      "Typography"
+    ]
+  },
+  {
+    "id": "fontshare",
+    "title": "Fontshare",
+    "url": "https://www.fontshare.com/",
+    "description": "Browse type families; review their individual license terms.",
+    "category": "Fonts",
+    "tags": [
+      "Typography"
+    ]
+  },
+  {
+    "id": "fontsquirrel",
+    "title": "Font Squirrel",
+    "url": "https://www.fontsquirrel.com/",
+    "description": "Discover fonts and webfont tools; check each license.",
+    "category": "Fonts",
+    "tags": [
+      "Typography"
+    ]
+  },
+  {
+    "id": "fontsource",
+    "title": "Fontsource",
+    "url": "https://fontsource.org/",
+    "description": "Self-host fonts through packages; review font licenses.",
+    "category": "Fonts",
+    "tags": [
+      "Typography"
+    ]
+  },
+  {
+    "id": "modern-font-stacks",
+    "title": "Modern Font Stacks",
+    "url": "https://modernfontstacks.com/",
+    "description": "Choose system font stacks without downloading font files.",
+    "category": "Fonts",
+    "tags": [
+      "CSS",
+      "Typography"
+    ]
+  },
+  {
+    "id": "type-scale",
+    "title": "Type Scale",
+    "url": "https://typescale.com/",
+    "description": "Explore heading and body sizes. Some features are paid.",
+    "category": "Fonts",
+    "tags": [
+      "Typography"
+    ]
+  },
+  {
+    "id": "lucide",
+    "title": "Lucide",
+    "url": "https://lucide.dev/",
+    "description": "Find consistent outline SVG icons; review the license.",
+    "category": "Icons & Illustrations",
+    "tags": [
+      "SVG",
+      "Icons"
+    ]
+  },
+  {
+    "id": "heroicons",
+    "title": "Heroicons",
+    "url": "https://heroicons.com/",
+    "description": "Choose SVG icons for interfaces; review the license.",
+    "category": "Icons & Illustrations",
+    "tags": [
+      "SVG",
+      "Icons"
+    ]
+  },
+  {
+    "id": "tabler",
+    "title": "Tabler Icons",
+    "url": "https://tabler.io/icons",
+    "description": "Browse a large icon set; review the license.",
+    "category": "Icons & Illustrations",
+    "tags": [
+      "SVG",
+      "Icons"
+    ]
+  },
+  {
+    "id": "phosphor",
+    "title": "Phosphor Icons",
+    "url": "https://phosphoricons.com/",
+    "description": "Choose icons in different weights; review the license.",
+    "category": "Icons & Illustrations",
+    "tags": [
+      "SVG",
+      "Icons"
+    ]
+  },
+  {
+    "id": "simple-icons",
+    "title": "Simple Icons",
+    "url": "https://simpleicons.org/",
+    "description": "Find brand icons; check trademark and license requirements.",
+    "category": "Icons & Illustrations",
+    "tags": [
+      "SVG",
+      "Icons"
+    ]
+  },
+  {
+    "id": "iconify",
+    "title": "Iconify",
+    "url": "https://iconify.design/",
+    "description": "Search multiple icon collections; each has its own license.",
+    "category": "Icons & Illustrations",
+    "tags": [
+      "SVG",
+      "Icons"
+    ]
+  },
+  {
+    "id": "undraw",
+    "title": "unDraw",
+    "url": "https://undraw.co/illustrations",
+    "description": "Find customizable illustrations; review usage terms.",
+    "category": "Icons & Illustrations",
+    "tags": [
+      "Illustrations"
+    ]
+  },
+  {
+    "id": "svgrepo",
+    "title": "SVG Repo",
+    "url": "https://www.svgrepo.com/",
+    "description": "Browse SVG assets; check the license of each asset.",
+    "category": "Icons & Illustrations",
+    "tags": [
+      "SVG",
+      "Illustrations"
+    ]
+  },
+  {
+    "id": "unsplash",
+    "title": "Unsplash",
+    "url": "https://unsplash.com/",
+    "description": "Find project photos; paid content and license restrictions may apply.",
+    "category": "Photos",
+    "tags": [
+      "Images"
+    ]
+  },
+  {
+    "id": "pexels",
+    "title": "Pexels",
+    "url": "https://www.pexels.com/",
+    "description": "Find photos and videos; review the usage license.",
+    "category": "Photos",
+    "tags": [
+      "Images"
+    ]
+  },
+  {
+    "id": "pixabay",
+    "title": "Pixabay",
+    "url": "https://pixabay.com/",
+    "description": "Find images and other media; review each asset and usage terms.",
+    "category": "Photos",
+    "tags": [
+      "Images"
+    ]
+  },
+  {
+    "id": "burst",
+    "title": "Burst",
+    "url": "https://www.shopify.com/stock-photos",
+    "description": "Browse stock photography; review the license before publishing.",
+    "category": "Photos",
+    "tags": [
+      "Images"
+    ]
+  },
+  {
+    "id": "picsum",
+    "title": "Lorem Picsum",
+    "url": "https://picsum.photos/",
+    "description": "Use placeholder photos during layout prototyping.",
+    "category": "Photos",
+    "tags": [
+      "Images",
+      "Prototyping"
+    ]
+  },
+  {
+    "id": "awwwards",
+    "title": "Awwwards",
+    "url": "https://www.awwwards.com/",
+    "description": "Explore expressive websites; some resources and courses are paid.",
+    "category": "Inspiration",
+    "tags": [
+      "Web design"
+    ]
+  },
+  {
+    "id": "siteinspire",
+    "title": "siteInspire",
+    "url": "https://www.siteinspire.com/",
+    "description": "Browse websites by style and subject for layout ideas.",
+    "category": "Inspiration",
+    "tags": [
+      "Web design"
+    ]
+  },
+  {
+    "id": "landbook",
+    "title": "Land-book",
+    "url": "https://land-book.com/",
+    "description": "Explore landing page designs. Some features are paid.",
+    "category": "Inspiration",
+    "tags": [
+      "Web design"
+    ]
+  },
+  {
+    "id": "onepagelove",
+    "title": "One Page Love",
+    "url": "https://onepagelove.com/",
+    "description": "Study single-page websites; templates may be paid.",
+    "category": "Inspiration",
+    "tags": [
+      "Web design"
+    ]
+  },
+  {
+    "id": "recent",
+    "title": "Recent",
+    "url": "https://recent.design/",
+    "description": "Explore curated web and interface design examples for inspiration.",
+    "category": "Inspiration",
+    "tags": [
+      "Web design"
+    ]
+  },
+  {
+    "id": "frontendmentor",
+    "title": "Frontend Mentor",
+    "url": "https://www.frontendmentor.io/",
+    "description": "Practice building interfaces from design challenges. Some challenges are paid.",
+    "category": "Inspiration",
+    "tags": [
+      "HTML",
+      "CSS",
+      "JavaScript"
+    ]
+  },
+  {
+    "id": "css-design-awards",
+    "title": "CSS Design Awards",
+    "url": "https://www.cssdesignawards.com/",
+    "description": "Explore awarded websites and study interface, experience and interaction ideas.",
+    "category": "Inspiration",
+    "tags": [
+      "Web design"
+    ]
+  }
+]

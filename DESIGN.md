@@ -4,7 +4,7 @@ Operate surface: a quiet workspace for reading and manually writing code. Follow
 
 Use flat neutral surfaces, a single 1px divider between regions, system UI typography and a monospace editor. No animation, gradients, decorative imagery or colorful file icons. Dark is the initial theme; Light shares the same geometry. UI font 13px, editor 14px with 1.65 line height. Explorer is 224px wide with a user-resizable divider, tabs 38px high, status 25px. Visible keyboard focus, legible muted text and accessible tree and tab controls.
 
-Theme tokens cover background, surface, text, muted text, border, selection, cursor and syntax colors. Empty state contains only Open Folder. Menus and destructive/unsaved confirmations are only shown on explicit actions. Errors stay in a compact dismissible strip.
+Theme tokens cover background, surface, text, muted text, border, selection, cursor and syntax colors. The empty state leads with Open Folder and offers quiet links to Settings, Sources and About mIDE. Menus and destructive/unsaved confirmations are only shown on explicit actions. Errors stay in a compact dismissible strip.
 
 The status bar can start a local static server for the open folder and reload the system browser after a file is written. Its 6px red and green dots are fixed status colors.
 
@@ -21,3 +21,5 @@ Theme settings list Dark, Light and the named built-in palettes with imported th
 About mIDE is a small native modal using the existing dialog style. Show build version, minimal IDE purpose, author, MIT license and a selectable source repository address. Keep the full license collapsed by default and return focus to the editor on dismissal.
 
 Document Find shows a quiet live occurrence count beside the input. Project Find is an explicit, modal text search with a query, one Search action, count and compact path/line/excerpt results. No permanent search sidebar. Escape restores editing, and selecting a result opens that location. Exclusions and incomplete results are explained inline.
+
+Sources is a dedicated full-window page like Settings, available from the workspace menu and the empty state. Keep the editor and terminal mounted beneath it. Use the existing theme tokens, 24px page heading, flat divided source rows and no imagery. A 200px category column with counts sits beside the list; at 720px and below it wraps above the results. Search and Add source sit above All / Favorites / My sources filters. Each row has a small SVG favorite star, linked title, domain, useful description, topic tags and an Actions disclosure. Collection actions contain import, export and Hidden sources. Forms and import confirmation expand inline. Show errors locally, keep failed writes out of committed UI state, and offer an eight-second Undo after deletion. Escape closes disclosures or forms before returning to the editor; restore keyboard focus on return.

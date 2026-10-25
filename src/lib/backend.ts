@@ -39,6 +39,9 @@ export interface OmarchyThemeFile {
   colors: Record<string, string>;
 }
 export const backend = {
+  importSources: () => invoke<string | null>("import_sources"),
+  exportSources: (text: string) => invoke<boolean>("export_sources", { text }),
+  openSourceUrl: (url: string) => invoke<void>("open_source_url", { url }),
   search: (query: string, buffers: { path: string; text: string }[]) =>
     invoke<ProjectSearchResults>("search_project", { query, buffers }),
   importTheme: () => invoke<string | null>("import_theme"),
