@@ -155,6 +155,29 @@ fn not_found() -> LiveReply {
     reply(404, "text/plain; charset=utf-8", "Not found")
 }
 
+fn redirect_location(relative: &Path) -> String {
+    let mut location = String::from("/");
+    for component in relative.components() {
+        if let Component::Normal(part) = component {
+            location.push_str(&part.to_string_lossy());
+            location.push('/');
+        }
+    }
+    location
+}
+
+fn directory_index_reply(root: &Path, dir: &Path) -> Result<Option<LiveReply>, LiveReply> {
+    let index = dir.join("index.html");
+    if index.symlink_metadata().is_err() {
+        return Ok(None);
+    }
+    let canonical = index.canonicalize().map_err(|_| not_found())?;
+    if !canonical.starts_with(root) || !canonical.is_file() {
+        return Err(not_found());
+    }
+    Ok(Some(file_reply(&canonical)))
+}
+
 pub fn respond(root: &Path, method: &str, target: &str) -> LiveReply {
     if method != "GET" {
         return reply(405, "text/plain; charset=utf-8", "");
@@ -184,14 +207,15 @@ pub fn respond(root: &Path, method: &str, target: &str) -> LiveReply {
             return LiveReply {
                 status: 302,
                 content_type: "text/plain; charset=utf-8",
-                location: Some(format!("{bare}/")),
+                location: Some(redirect_location(&relative)),
                 body: Vec::new(),
                 events: false,
             };
         }
-        let index = path.join("index.html");
-        if index.is_file() {
-            return file_reply(&index);
+        match directory_index_reply(&root, &path) {
+            Ok(Some(reply)) => return reply,
+            Ok(None) => {}
+            Err(reply) => return reply,
         }
         return match directory_listing(&path) {
             Some(html) => reply(200, "text/html; charset=utf-8", html),
@@ -348,6 +372,36 @@ mod tests {
             respond(&root, "GET", "/blob.bin").content_type,
             "application/octet-stream"
         );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn index_html_symlink_outside_project_is_not_served() {
+        let root = temp();
+        let outside = std::env::temp_dir().join(format!("mide-outside-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&outside);
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("secret.html"), "<html>secret</html>").unwrap();
+        std::os::unix::fs::symlink(outside.join("secret.html"), root.join("index.html")).unwrap();
+        fs::create_dir_all(root.join("docs")).unwrap();
+        std::os::unix::fs::symlink(outside.join("secret.html"), root.join("docs/index.html")).unwrap();
+        for target in ["/", "/docs/"] {
+            let reply = respond(&root, "GET", target);
+            assert_eq!(reply.status, 404, "{target}");
+            assert_eq!(reply.body, b"Not found", "{target}");
+        }
+        let _ = fs::remove_dir_all(&outside);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn directory_redirect_normalizes_location_path() {
+        let root = temp();
+        fs::create_dir_all(root.join("evil.com")).unwrap();
+        let reply = respond(&root, "GET", "//evil.com");
+        assert_eq!(reply.status, 302);
+        assert_eq!(reply.location.as_deref(), Some("/evil.com/"));
         let _ = fs::remove_dir_all(root);
     }
 
