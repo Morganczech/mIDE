@@ -344,6 +344,7 @@ pub fn serve(listener: TcpListener, root: PathBuf, shutdown: Receiver<()>, reloa
             match listener.accept() {
                 Ok((mut stream, _)) => {
                     accepted = true;
+                    stream.set_nonblocking(false).ok();
                     stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
                     let Ok((method, target)) = read_request(&mut stream) else {
                         continue;
