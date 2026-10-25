@@ -6,6 +6,8 @@ Use flat neutral surfaces, a single 1px divider between regions, system UI typog
 
 Theme tokens cover background, surface, text, muted text, border, selection, cursor and syntax colors. Empty state contains only Open Folder. Menus and destructive/unsaved confirmations are only shown on explicit actions. Errors stay in a compact dismissible strip.
 
+The status bar can start a local static server for the open folder and reload the system browser after a file is written. Its 6px red and green dots are fixed status colors.
+
 Focus Mode keeps file tabs visible for switching documents; it hides the Explorer, menu, status bar and terminal.
 
 Settings is a dedicated full-window page with a clear Back to Editor action. Use flat divided rows for font controls, a live text sample, and the theme library. Keep the current editor and terminal mounted underneath to preserve their state. Adapt controls to a vertical layout in narrow windows.

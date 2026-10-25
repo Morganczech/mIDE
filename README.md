@@ -39,6 +39,8 @@ npm run tauri build -- --no-bundle
 
 Open a folder, then click a file in the Explorer. Use the Explorer's plus button to create items at the project root; right-click an item (or Shift+F10) for creation, rename and permanent deletion. Directories load when expanded. Refresh updates the tree after external changes.
 
+Go Live, at the trailing end of the status bar, serves the open folder at `http://127.0.0.1` on the first free port from 5500 through 5509 and opens that address in the system browser. The button then shows the port; click it again to stop. Saving a file reloads the open pages. The project-root `index.html` also has Open in Browser in its right-click menu. Switching projects or closing the window stops the server. Focus Mode hides the control and leaves the server running.
+
 The menu provides Open Folder, Save, Find, Format Document, Toggle Terminal, Settings, theme selection, Focus Mode and About mIDE. About shows the application version, purpose, author, repository address and MIT license. The current cursor line and its line number are subtly highlighted in both themes. Unsaved files show a small dot. Closing a changed tab, switching projects or closing the window asks whether to save, discard or cancel. Saving a file changed by another program reports a conflict; copy your changes if needed, close/discard the tab, and reopen the file before applying them again. The app never silently overwrites external changes.
 
 | Action | Linux / Windows | macOS |
