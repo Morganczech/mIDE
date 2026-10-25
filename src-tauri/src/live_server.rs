@@ -1,13 +1,16 @@
+use crate::filesystem::{AppError, Result, Workspace};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use serde::Serialize;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+use tauri::State;
 
 pub const RELOAD_SCRIPT: &str = r##"<script>
 (() => {
@@ -174,7 +177,7 @@ fn redirect_location(relative: &Path) -> String {
     location
 }
 
-fn directory_index_reply(root: &Path, dir: &Path) -> Result<Option<LiveReply>, LiveReply> {
+fn directory_index_reply(root: &Path, dir: &Path) -> std::result::Result<Option<LiveReply>, LiveReply> {
     let index = dir.join("index.html");
     if index.symlink_metadata().is_err() {
         return Ok(None);
@@ -427,6 +430,134 @@ pub fn start_watch(root: &Path, events: Sender<()>) -> notify::Result<Recommende
     })?;
     watcher.watch(root, RecursiveMode::Recursive)?;
     Ok(watcher)
+}
+
+#[derive(Default)]
+pub struct LiveState(Mutex<Option<Running>>);
+
+struct Running {
+    port: u16,
+    shutdown: Sender<()>,
+    thread: thread::JoinHandle<()>,
+    watcher: Option<RecommendedWatcher>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiveServerInfo {
+    pub port: u16,
+    pub url: String,
+    pub browser_error: Option<String>,
+    pub watch_error: Option<String>,
+}
+
+impl LiveState {
+    pub fn stop(&self) {
+        let running = self.0.lock().ok().and_then(|mut guard| guard.take());
+        if let Some(running) = running {
+            let _ = running.shutdown.send(());
+            let _ = running.thread.join();
+            drop(running.watcher);
+        }
+    }
+
+    pub fn start(&self, workspace: &Workspace) -> Result<LiveServerInfo> {
+        let root = workspace.root()?;
+        let existing_port = self
+            .0
+            .lock()
+            .map_err(|_| AppError::new("STATE", "Live Server unavailable"))?
+            .as_ref()
+            .map(|running| running.port);
+        if let Some(port) = existing_port {
+            return Ok(info(port, None, None));
+        }
+        let ports: Vec<u16> = LIVE_PORTS.collect();
+        let (listener, port) = bind_first(&ports).map_err(|_| {
+            AppError::new("LIVE_SERVER", "Live Server could not find a free port.")
+        })?;
+        let (shutdown_tx, shutdown_rx) = mpsc::channel();
+        let (reload_tx, reload_rx) = mpsc::channel();
+        let (watch_tx, watch_rx) = mpsc::channel();
+        let (watcher, watch_message) = match start_watch(&root, watch_tx) {
+            Ok(watcher) => {
+                thread::spawn(move || {
+                    let mut debounce = Debounce::new(Duration::from_millis(200));
+                    loop {
+                        match watch_rx.recv_timeout(Duration::from_millis(50)) {
+                            Ok(()) => debounce.arm(Instant::now()),
+                            Err(mpsc::RecvTimeoutError::Timeout) => {}
+                            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                        }
+                        if debounce.poll(Instant::now()) && reload_tx.send(()).is_err() {
+                            break;
+                        }
+                    }
+                });
+                (Some(watcher), None)
+            }
+            Err(_) => (None, Some("Live Server cannot watch files for reload.".to_string())),
+        };
+        let served = root.clone();
+        let thread = thread::spawn(move || serve(listener, served, shutdown_rx, reload_rx));
+        let url = format!("http://127.0.0.1:{port}/");
+        let running = Running {
+            port,
+            shutdown: shutdown_tx,
+            thread,
+            watcher,
+        };
+        *self
+            .0
+            .lock()
+            .map_err(|_| AppError::new("STATE", "Live Server unavailable"))? = Some(running);
+        let browser_error = open_browser(&url)
+            .err()
+            .map(|_| format!("Could not open the browser. Open {url}"));
+        Ok(info(port, browser_error, watch_message))
+    }
+
+    pub fn open(&self) -> Result<()> {
+        let port = self
+            .0
+            .lock()
+            .map_err(|_| AppError::new("STATE", "Live Server unavailable"))?
+            .as_ref()
+            .map(|running| running.port)
+            .ok_or_else(|| AppError::new("LIVE_SERVER", "Live Server is not running."))?;
+        let url = format!("http://127.0.0.1:{port}/");
+        open_browser(&url).map_err(|_| {
+            AppError::new("LIVE_SERVER", format!("Could not open the browser. Open {url}"))
+        })
+    }
+}
+
+fn info(port: u16, browser_error: Option<String>, watch_error: Option<String>) -> LiveServerInfo {
+    LiveServerInfo {
+        port,
+        url: format!("http://127.0.0.1:{port}/"),
+        browser_error,
+        watch_error,
+    }
+}
+
+#[tauri::command]
+pub fn live_server_start(
+    live: State<'_, LiveState>,
+    workspace: State<'_, Workspace>,
+) -> Result<LiveServerInfo> {
+    live.start(&workspace)
+}
+
+#[tauri::command]
+pub fn live_server_stop(live: State<'_, LiveState>) -> Result<()> {
+    live.stop();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn live_server_open(live: State<'_, LiveState>) -> Result<()> {
+    live.open()
 }
 
 fn write_tree(root: &Path) {
@@ -682,5 +813,18 @@ mod tests {
         let _ = shutdown_tx.send(());
         thread.join().unwrap();
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn start_without_a_project_does_not_listen() {
+        let live = LiveState::default();
+        let workspace = crate::filesystem::Workspace::default();
+        let error = live.start(&workspace).unwrap_err();
+        assert_eq!(error.message, "Open a folder first");
+    }
+
+    #[test]
+    fn stop_without_a_server_is_harmless() {
+        LiveState::default().stop();
     }
 }

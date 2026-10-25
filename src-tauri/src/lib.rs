@@ -14,10 +14,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(filesystem::Workspace::default())
         .manage(terminal::TerminalState::default())
+        .manage(live_server::LiveState::default())
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 use tauri::Manager;
                 window.state::<terminal::TerminalState>().stop();
+                window.state::<live_server::LiveState>().stop();
             }
         });
     #[cfg(not(feature = "smoke-test"))]
@@ -40,7 +42,10 @@ pub fn run() {
         terminal::terminal_resize,
         terminal::terminal_ack,
         terminal::terminal_stop,
-        terminal::terminal_running
+        terminal::terminal_running,
+        live_server::live_server_start,
+        live_server::live_server_stop,
+        live_server::live_server_open
     ]);
     #[cfg(feature = "smoke-test")]
     let builder = builder
@@ -64,6 +69,9 @@ pub fn run() {
             terminal::terminal_ack,
             terminal::terminal_stop,
             terminal::terminal_running,
+            live_server::live_server_start,
+            live_server::live_server_stop,
+            live_server::live_server_open,
             smoke::smoke_report
         ])
         .on_page_load(|webview, payload| {
