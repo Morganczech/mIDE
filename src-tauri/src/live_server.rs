@@ -1,5 +1,13 @@
+use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs;
+use std::io::{Read, Write};
+use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
 
 pub const RELOAD_SCRIPT: &str = r##"<script>
 (() => {
@@ -241,6 +249,185 @@ fn file_reply(path: &Path) -> LiveReply {
     }
 }
 
+pub const LIVE_PORTS: std::ops::RangeInclusive<u16> = 5500..=5509;
+
+pub fn bind_first(ports: &[u16]) -> std::io::Result<(TcpListener, u16)> {
+    let mut last = std::io::Error::from(std::io::ErrorKind::AddrInUse);
+    for port in ports {
+        match TcpListener::bind((Ipv4Addr::LOCALHOST, *port)) {
+            Ok(listener) => {
+                let port = listener.local_addr()?.port();
+                return Ok((listener, port));
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => last = error,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(last)
+}
+
+pub struct Debounce {
+    delay: Duration,
+    armed: Option<Instant>,
+}
+
+impl Debounce {
+    pub fn new(delay: Duration) -> Self {
+        Self { delay, armed: None }
+    }
+
+    pub fn arm(&mut self, now: Instant) {
+        if self.armed.is_none() {
+            self.armed = Some(now);
+        }
+    }
+
+    pub fn poll(&mut self, now: Instant) -> bool {
+        match self.armed {
+            Some(started) if now.duration_since(started) >= self.delay => {
+                self.armed = None;
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+fn read_request(stream: &mut TcpStream) -> std::io::Result<(String, String)> {
+    let mut buffer = Vec::new();
+    let mut byte = [0];
+    while buffer.len() < 8192 {
+        if stream.read(&mut byte)? == 0 {
+            break;
+        }
+        buffer.push(byte[0]);
+        if buffer.ends_with(b"\r\n\r\n") {
+            break;
+        }
+    }
+    let text = String::from_utf8_lossy(&buffer);
+    let mut parts = text.lines().next().unwrap_or("").split_whitespace();
+    let method = parts.next().unwrap_or("").to_string();
+    let target = parts.next().unwrap_or("/").to_string();
+    if method.is_empty() {
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "request"));
+    }
+    Ok((method, target))
+}
+
+fn write_reply(stream: &mut TcpStream, reply: &LiveReply) -> std::io::Result<()> {
+    let reason = match reply.status {
+        200 => "OK",
+        302 => "Found",
+        404 => "Not Found",
+        405 => "Method Not Allowed",
+        _ => "OK",
+    };
+    write!(stream, "HTTP/1.1 {} {reason}\r\n", reply.status)?;
+    write!(stream, "Content-Type: {}\r\n", reply.content_type)?;
+    if let Some(location) = &reply.location {
+        write!(stream, "Location: {location}\r\n")?;
+    }
+    write!(stream, "Content-Length: {}\r\nConnection: close\r\n\r\n", reply.body.len())?;
+    stream.write_all(&reply.body)
+}
+
+pub fn serve(listener: TcpListener, root: PathBuf, shutdown: Receiver<()>, reloads: Receiver<()>) {
+    listener.set_nonblocking(true).ok();
+    let clients: Arc<Mutex<Vec<TcpStream>>> = Arc::new(Mutex::new(Vec::new()));
+    'serve: loop {
+        if shutdown.try_recv().is_ok() {
+            break;
+        }
+        let mut accepted = false;
+        loop {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    accepted = true;
+                    stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
+                    let Ok((method, target)) = read_request(&mut stream) else {
+                        continue;
+                    };
+                    let response = respond(&root, &method, &target);
+                    if response.events {
+                        let headers = b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n";
+                        if stream.write_all(headers).is_ok() {
+                            stream.set_nonblocking(true).ok();
+                            if let Ok(mut clients) = clients.lock() {
+                                clients.push(stream);
+                            }
+                        }
+                    } else {
+                        write_reply(&mut stream, &response).ok();
+                    }
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
+                Err(_) => break 'serve,
+            }
+        }
+        while reloads.try_recv().is_ok() {
+            if let Ok(mut clients) = clients.lock() {
+                clients.retain_mut(|client| {
+                    client.write_all(b"data: reload\n\n").is_ok() && client.flush().is_ok()
+                });
+            }
+        }
+        if !accepted {
+            thread::sleep(Duration::from_millis(20));
+        }
+    }
+    if let Ok(mut clients) = clients.lock() {
+        clients.clear();
+    };
+}
+
+pub fn open_browser(url: &str) -> std::io::Result<()> {
+    browser_command(url)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
+}
+
+fn browser_command(url: &str) -> Command {
+    #[cfg(target_os = "macos")]
+    {
+        let mut command = Command::new("open");
+        command.arg(url);
+        command
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let mut command = Command::new("cmd");
+        command.args(["/C", "start", "", url]);
+        command
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let mut command = Command::new("xdg-open");
+        command.arg(url);
+        command
+    }
+}
+
+pub fn start_watch(root: &Path, events: Sender<()>) -> notify::Result<RecommendedWatcher> {
+    let started = Instant::now();
+    let mut watcher = notify::recommended_watcher(move |result: notify::Result<notify::Event>| {
+        let Ok(event) = result else {
+            return;
+        };
+        if matches!(event.kind, EventKind::Access(_)) || started.elapsed() < Duration::from_millis(300) {
+            return;
+        }
+        if matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)) {
+            let _ = events.send(());
+        }
+    })?;
+    watcher.watch(root, RecursiveMode::Recursive)?;
+    Ok(watcher)
+}
+
 fn write_tree(root: &Path) {
     fs::create_dir_all(root.join("css")).unwrap();
     fs::write(root.join("index.html"), "<html><body>Hi</body></html>").unwrap();
@@ -415,5 +602,84 @@ mod tests {
         let last_body = lower.rfind("</body>").unwrap();
         assert!(script_at < last_body);
         assert_eq!(lower.matches("</body>").count(), 2);
+    }
+
+    use std::io::{Read, Write};
+    use std::net::{Ipv4Addr, TcpListener, TcpStream};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn ports_are_5500_through_5509() {
+        assert_eq!(*LIVE_PORTS.start(), 5500);
+        assert_eq!(*LIVE_PORTS.end(), 5509);
+    }
+
+    #[test]
+    fn bind_skips_a_busy_port() {
+        let busy = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let busy_port = busy.local_addr().unwrap().port();
+        let (_listener, port) = bind_first(&[busy_port, 0]).unwrap();
+        assert_ne!(port, busy_port);
+    }
+
+    #[test]
+    fn bind_fails_when_every_port_is_busy() {
+        let first = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let second = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let ports = [
+            first.local_addr().unwrap().port(),
+            second.local_addr().unwrap().port(),
+        ];
+        assert!(bind_first(&ports).is_err());
+    }
+
+    #[test]
+    fn debounce_collapses_a_burst_into_one_reload() {
+        let mut debounce = Debounce::new(Duration::from_millis(200));
+        let start = Instant::now();
+        debounce.arm(start);
+        debounce.arm(start + Duration::from_millis(50));
+        assert!(!debounce.poll(start + Duration::from_millis(199)));
+        assert!(debounce.poll(start + Duration::from_millis(200)));
+        assert!(!debounce.poll(start + Duration::from_millis(250)));
+    }
+
+    #[test]
+    fn server_reloads_connected_pages_once() {
+        let root = temp();
+        fs::write(root.join("index.html"), "<html><body>Hi</body></html>").unwrap();
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
+        let (reload_tx, reload_rx) = std::sync::mpsc::channel();
+        let served = root.clone();
+        let thread = std::thread::spawn(move || serve(listener, served, shutdown_rx, reload_rx));
+        let mut page = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
+        page.write_all(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n").unwrap();
+        let mut buffer = Vec::new();
+        page.read_to_end(&mut buffer).unwrap();
+        assert!(String::from_utf8_lossy(&buffer).contains("EventSource"));
+        let mut events = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
+        events.write_all(b"GET /__mide/live HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n").unwrap();
+        events.set_read_timeout(Some(Duration::from_millis(200))).unwrap();
+        reload_tx.send(()).unwrap();
+        let mut event = String::new();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while Instant::now() < deadline && !event.contains("data: reload") {
+            let mut chunk = [0; 256];
+            match events.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(count) => event.push_str(&String::from_utf8_lossy(&chunk[..count])),
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::WouldBlock
+                        || error.kind() == std::io::ErrorKind::TimedOut =>
+                {}
+                Err(_) => break,
+            }
+        }
+        assert!(event.contains("data: reload\n"), "{event}");
+        let _ = shutdown_tx.send(());
+        thread.join().unwrap();
+        let _ = fs::remove_dir_all(root);
     }
 }
