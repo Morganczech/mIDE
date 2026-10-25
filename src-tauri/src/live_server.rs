@@ -339,8 +339,9 @@ pub fn serve(listener: TcpListener, root: PathBuf, shutdown: Receiver<()>, reloa
     listener.set_nonblocking(true).ok();
     let clients: Arc<Mutex<Vec<TcpStream>>> = Arc::new(Mutex::new(Vec::new()));
     'serve: loop {
-        if shutdown.try_recv().is_ok() {
-            break;
+        match shutdown.try_recv() {
+            Ok(()) | Err(mpsc::TryRecvError::Disconnected) => break,
+            Err(mpsc::TryRecvError::Empty) => {}
         }
         let mut accepted = false;
         loop {
@@ -451,25 +452,36 @@ pub struct LiveServerInfo {
     pub watch_error: Option<String>,
 }
 
+fn stop_running(running: Running) {
+    let _ = running.shutdown.send(());
+    let _ = running.thread.join();
+    drop(running.watcher);
+}
+
+fn store_running(slot: &mut Option<Running>, running: Running) -> bool {
+    if slot.is_some() {
+        stop_running(running);
+        return false;
+    }
+    *slot = Some(running);
+    true
+}
+
 impl LiveState {
     pub fn stop(&self) {
         let running = self.0.lock().ok().and_then(|mut guard| guard.take());
         if let Some(running) = running {
-            let _ = running.shutdown.send(());
-            let _ = running.thread.join();
-            drop(running.watcher);
+            stop_running(running);
         }
     }
 
     pub fn start(&self, workspace: &Workspace) -> Result<LiveServerInfo> {
         let root = workspace.root()?;
-        let existing_port = self
+        let mut slot = self
             .0
             .lock()
-            .map_err(|_| AppError::new("STATE", "Live Server unavailable"))?
-            .as_ref()
-            .map(|running| running.port);
-        if let Some(port) = existing_port {
+            .map_err(|_| AppError::new("STATE", "Live Server unavailable"))?;
+        if let Some(port) = slot.as_ref().map(|running| running.port) {
             return Ok(info(port, None, None));
         }
         let ports: Vec<u16> = LIVE_PORTS.collect();
@@ -507,10 +519,14 @@ impl LiveState {
             thread,
             watcher,
         };
-        *self
-            .0
-            .lock()
-            .map_err(|_| AppError::new("STATE", "Live Server unavailable"))? = Some(running);
+        if !store_running(&mut slot, running) {
+            let port = slot
+                .as_ref()
+                .map(|running| running.port)
+                .ok_or_else(|| AppError::new("STATE", "Live Server unavailable"))?;
+            return Ok(info(port, None, None));
+        }
+        drop(slot);
         let browser_error = open_browser(&url)
             .err()
             .map(|_| format!("Could not open the browser. Open {url}"));
@@ -826,5 +842,27 @@ mod tests {
     #[test]
     fn stop_without_a_server_is_harmless() {
         LiveState::default().stop();
+    }
+
+    #[test]
+    fn serve_returns_when_the_shutdown_sender_is_dropped() {
+        let root = temp();
+        fs::write(root.join("index.html"), "<html><body>Hi</body></html>").unwrap();
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
+        let (reload_tx, reload_rx) = std::sync::mpsc::channel();
+        let served = root.clone();
+        let thread = thread::spawn(move || serve(listener, served, shutdown_rx, reload_rx));
+        drop(shutdown_tx);
+        let started = Instant::now();
+        while !thread.is_finished() {
+            if started.elapsed() > Duration::from_secs(2) {
+                panic!("serve did not return after the shutdown sender was dropped");
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        thread.join().unwrap();
+        drop(reload_tx);
+        let _ = fs::remove_dir_all(root);
     }
 }
