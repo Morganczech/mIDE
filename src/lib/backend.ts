@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { LiveServerInfo } from "./live-server";
 export interface Project {
   name: string;
   path: string;
@@ -57,6 +58,9 @@ export const backend = {
   rename: (path: string, destination: string) =>
     invoke<void>("rename_entry", { path, destination }),
   delete: (path: string) => invoke<void>("delete_entry", { path }),
+  liveServerStart: () => invoke<LiveServerInfo>("live_server_start"),
+  liveServerStop: () => invoke<void>("live_server_stop"),
+  liveServerOpen: () => invoke<void>("live_server_open"),
 };
 export function errorMessage(error: unknown): string {
   return typeof error === "object" && error !== null && "message" in error

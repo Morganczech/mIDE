@@ -46,6 +46,7 @@ import {
   type Project,
   type ProjectMatch,
 } from "./lib/backend";
+import { LIVE_STOPPED, liveControl, startedStatus } from "./lib/live-server";
 import {
   openDocument,
   isDirty,
@@ -129,6 +130,11 @@ export default function App() {
   const [menu, setMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  const [live, setLive] = useState<{ port: number; url: string } | null>(null);
+  const [liveMessage, setLiveMessage] = useState("");
+  const liveRef = useRef(live);
+  const liveBusy = useRef(false);
+  liveRef.current = live;
   const view = useRef<EditorView | null>(null);
   const active = documents.current.find((doc) => doc.id === activeId);
   const currentActions = useRef({
@@ -211,6 +217,11 @@ export default function App() {
         return;
       const next = await backend.openProject();
       if (!next) return;
+      if (liveRef.current) {
+        await backend.liveServerStop();
+        setLive(null);
+        setLiveMessage(LIVE_STOPPED);
+      }
       documents.current = [];
       setTerminalCreated(false);
       setTerminalOpen(false);
@@ -218,6 +229,27 @@ export default function App() {
       setProject(next);
       setVersion((v) => v + 1);
     });
+  const toggleLive = async () => {
+    if (liveBusy.current) return;
+    liveBusy.current = true;
+    try {
+      if (liveRef.current) {
+        await backend.liveServerStop();
+        setLive(null);
+        setLiveMessage(LIVE_STOPPED);
+      } else {
+        const info = await backend.liveServerStart();
+        const status = startedStatus(info);
+        setLive({ port: info.port, url: info.url });
+        setLiveMessage(status.message);
+        setError(status.error);
+      }
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      liveBusy.current = false;
+    }
+  };
   const openFile = (path: string, match?: ProjectMatch) =>
     run(async () => {
       let doc = documents.current.find((item) => item.path === path);
@@ -886,6 +918,14 @@ export default function App() {
             </button>
           </div>
         )}
+        {liveMessage && (
+          <div className="status-strip" role="status">
+            <span>{liveMessage}</span>
+            <button aria-label="Dismiss status" onClick={() => setLiveMessage("")}>
+              Dismiss
+            </button>
+          </div>
+        )}
         {active ? (
           <Editor
             document={active}
@@ -946,6 +986,14 @@ export default function App() {
               </span>
             </>
           )}
+          <button
+            className={liveControl(live).running ? "live-server running" : "live-server"}
+            aria-label={liveControl(live).name}
+            onClick={() => void toggleLive()}
+          >
+            <span className="dot" aria-hidden="true" />
+            {liveControl(live).label}
+          </button>
         </footer>
       )}
       {focus && focusHint && (

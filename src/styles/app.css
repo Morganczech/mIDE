@@ -284,7 +284,8 @@ main {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.error-strip {
+.error-strip,
+.status-strip {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -292,13 +293,36 @@ main {
   background: var(--raised);
   border-bottom: 1px solid var(--border);
 }
-.error-strip span {
+.error-strip span,
+.status-strip span {
   flex: 1;
   overflow-wrap: anywhere;
 }
-.error-strip button {
+.error-strip button,
+.status-strip button {
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+.status .live-server {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  color: var(--muted);
+}
+.status .live-server .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c44747;
+  flex: none;
+}
+.status .live-server.running .dot {
+  background: #2f9e57;
+}
+.status .live-server:hover {
+  background: transparent;
 }
 .menu-dismiss {
   position: fixed;
