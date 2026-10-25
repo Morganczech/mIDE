@@ -1,7 +1,12 @@
 import { ensureSyntaxTree } from "@codemirror/language";
 import { describe, expect, it } from "vitest";
 import { createEditorState } from "../src/editor/config";
-import { colorTextFromPicker, cssColors } from "../src/editor/css-colors";
+import {
+  colorTextFromPicker,
+  cssColors,
+  hexToHsv,
+  hsvToHex,
+} from "../src/editor/css-colors";
 
 function colorsIn(path: string, text: string) {
   const { state } = createEditorState(text, path, "LF");
@@ -61,5 +66,15 @@ describe("CSS color swatches", () => {
     expect(colorTextFromPicker("#ffffff", 0.5)).toBe("#ffffff80");
     expect(colorTextFromPicker("#aabbcc", 128 / 255)).toBe("#aabbcc80");
     expect(colorTextFromPicker("#000000", 0)).toBe("#00000000");
+  });
+
+  it("converts hex and hsv without drifting primaries", () => {
+    expect(hsvToHex(0, 1, 1)).toBe("#ff0000");
+    expect(hsvToHex(120, 1, 1)).toBe("#00ff00");
+    expect(hsvToHex(240, 1, 1)).toBe("#0000ff");
+    expect(hsvToHex(0, 0, 1)).toBe("#ffffff");
+    expect(hexToHsv("#00ff00")).toMatchObject({ h: 120, s: 1, v: 1 });
+    const rose = hexToHsv("#e11d48");
+    expect(hsvToHex(rose.h, rose.s, rose.v)).toBe("#e11d48");
   });
 });

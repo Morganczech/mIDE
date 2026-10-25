@@ -322,6 +322,46 @@ function parseColor(source: string) {
   return parseFunction(text);
 }
 
+export function hexToHsv(hex: string) {
+  const parsed = parseHex(hex);
+  if (!parsed) return { h: 0, s: 0, v: 0 };
+  const r = Number.parseInt(parsed.hex.slice(1, 3), 16) / 255;
+  const g = Number.parseInt(parsed.hex.slice(3, 5), 16) / 255;
+  const b = Number.parseInt(parsed.hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  let h = 0;
+  if (delta !== 0) {
+    if (max === r) h = ((g - b) / delta) % 6;
+    else if (max === g) h = (b - r) / delta + 2;
+    else h = (r - g) / delta + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return { h, s: max === 0 ? 0 : delta / max, v: max };
+}
+
+export function hsvToHex(h: number, s: number, v: number) {
+  const hue = ((h % 360) + 360) % 360;
+  const chroma = clamp(v, 0, 1) * clamp(s, 0, 1);
+  const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = clamp(v, 0, 1) - chroma;
+  const [r, g, b] =
+    hue < 60
+      ? [chroma, x, 0]
+      : hue < 120
+        ? [x, chroma, 0]
+        : hue < 180
+          ? [0, chroma, x]
+          : hue < 240
+            ? [0, x, chroma]
+            : hue < 300
+              ? [x, 0, chroma]
+              : [chroma, 0, x];
+  return `#${byte((r + m) * 255)}${byte((g + m) * 255)}${byte((b + m) * 255)}`;
+}
+
 export function colorTextFromPicker(hex: string, alpha: number) {
   const rgb = hex.trim().toLowerCase();
   const alphaByte = Math.round(clamp(alpha, 0, 1) * 255);
@@ -358,6 +398,11 @@ export function cssColors(state: EditorState): CssColor[] {
 }
 
 class ColorSwatch extends WidgetType {
+  private panel: HTMLDivElement | null = null;
+  private scrollTarget: HTMLElement | null = null;
+  private onScroll: (() => void) | null = null;
+  private applying = false;
+  private dead = false;
   constructor(readonly color: CssColor) {
     super();
   }
@@ -371,31 +416,152 @@ class ColorSwatch extends WidgetType {
   ignoreEvent() {
     return true;
   }
+  destroy() {
+    this.dead = true;
+    if (this.scrollTarget && this.onScroll)
+      this.scrollTarget.removeEventListener("scroll", this.onScroll);
+    this.panel?.remove();
+    this.panel = null;
+  }
   toDOM(view: EditorView) {
+    const color = this.color;
     const swatch = document.createElement("span");
     swatch.className = "cm-color-swatch";
-    swatch.style.background = this.color.css;
-    const input = document.createElement("input");
-    input.type = "color";
-    input.value = this.color.hex;
-    input.style.setProperty("--cm-color", this.color.css);
-    input.setAttribute("aria-label", `Edit color ${this.color.source}`);
-    input.addEventListener("click", (event) => {
-      try {
-        input.showPicker();
-        event.preventDefault();
-      } catch {
-        // The visible color input opens its own picker from this click.
-      }
-    });
-    input.addEventListener("change", () => {
-      const { from, to, source, alpha } = this.color;
-      const insert = colorTextFromPicker(input.value, alpha);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.style.setProperty("--cm-color", color.css);
+    button.setAttribute("aria-label", `Edit color ${color.source}`);
+    // WebKitGTK maps input[type=color] onto a GtkColorSwatch dialog that
+    // aborts the process when its icon fails to load.
+    const panel = document.createElement("div");
+    panel.className = "cm-color-picker";
+    panel.popover = "auto";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-label", "Edit color");
+    const field = document.createElement("div");
+    field.className = "cm-color-field";
+    field.tabIndex = 0;
+    field.setAttribute("role", "application");
+    field.setAttribute("aria-label", "Saturation and brightness");
+    const thumb = document.createElement("span");
+    thumb.className = "cm-color-thumb";
+    field.append(thumb);
+    const hue = document.createElement("input");
+    hue.className = "cm-color-hue";
+    hue.type = "range";
+    hue.min = "0";
+    hue.max = "360";
+    hue.step = "1";
+    hue.setAttribute("aria-label", "Hue");
+    const hexInput = document.createElement("input");
+    hexInput.className = "cm-color-hex";
+    hexInput.type = "text";
+    hexInput.spellcheck = false;
+    hexInput.maxLength = 7;
+    hexInput.autocomplete = "off";
+    hexInput.setAttribute("aria-label", "Hex color");
+    panel.append(field, hue, hexInput);
+    let hsv = hexToHsv(color.hex);
+    const paint = (keepHexText = false) => {
+      const hex = hsvToHex(hsv.h, hsv.s, hsv.v);
+      const preview = colorTextFromPicker(hex, color.alpha);
+      button.style.setProperty("--cm-color", preview);
+      field.style.setProperty("--cm-hue", `hsl(${hsv.h} 100% 50%)`);
+      thumb.style.left = `${hsv.s * 100}%`;
+      thumb.style.top = `${(1 - hsv.v) * 100}%`;
+      hue.value = String(Math.round(hsv.h));
+      if (!keepHexText) hexInput.value = hex;
+      field.setAttribute("aria-valuetext", preview);
+    };
+    const apply = () => {
+      if (this.applying || this.dead || !view.dom.isConnected) return;
+      const insert = colorTextFromPicker(
+        hsvToHex(hsv.h, hsv.s, hsv.v),
+        color.alpha,
+      );
+      const { from, to, source } = color;
       if (view.state.doc.sliceString(from, to) !== source || insert === source)
         return;
-      view.dispatch({ changes: { from, to, insert } });
+      this.applying = true;
+      try {
+        view.dispatch({ changes: { from, to, insert } });
+      } finally {
+        this.applying = false;
+      }
+    };
+    const place = () => {
+      const rect = button.getBoundingClientRect();
+      const margin = 6;
+      const width = panel.offsetWidth;
+      const height = panel.offsetHeight;
+      let left = rect.left;
+      let top = rect.bottom + margin;
+      if (left + width > window.innerWidth - 8)
+        left = window.innerWidth - width - 8;
+      if (left < 8) left = 8;
+      if (top + height > window.innerHeight - 8)
+        top = Math.max(8, rect.top - height - margin);
+      panel.style.left = `${left}px`;
+      panel.style.top = `${top}px`;
+    };
+    panel.addEventListener("toggle", (event) => {
+      const state = (event as ToggleEvent).newState;
+      if (state === "open") {
+        paint();
+        place();
+        return;
+      }
+      apply();
     });
-    swatch.append(input);
+    const setFromPointer = (event: PointerEvent) => {
+      const rect = field.getBoundingClientRect();
+      hsv = {
+        h: hsv.h,
+        s: clamp((event.clientX - rect.left) / rect.width, 0, 1),
+        v: clamp(1 - (event.clientY - rect.top) / rect.height, 0, 1),
+      };
+      paint();
+    };
+    field.addEventListener("pointerdown", (event) => {
+      field.setPointerCapture(event.pointerId);
+      setFromPointer(event);
+    });
+    field.addEventListener("pointermove", (event) => {
+      if (field.hasPointerCapture(event.pointerId)) setFromPointer(event);
+    });
+    field.addEventListener("keydown", (event) => {
+      const step = event.shiftKey ? 0.1 : 0.02;
+      if (event.key === "ArrowLeft") hsv = { ...hsv, s: clamp(hsv.s - step, 0, 1) };
+      else if (event.key === "ArrowRight")
+        hsv = { ...hsv, s: clamp(hsv.s + step, 0, 1) };
+      else if (event.key === "ArrowDown")
+        hsv = { ...hsv, v: clamp(hsv.v - step, 0, 1) };
+      else if (event.key === "ArrowUp")
+        hsv = { ...hsv, v: clamp(hsv.v + step, 0, 1) };
+      else return;
+      event.preventDefault();
+      paint();
+    });
+    hue.addEventListener("input", () => {
+      hsv = { ...hsv, h: Number(hue.value) };
+      paint();
+    });
+    hexInput.addEventListener("input", () => {
+      const value = hexInput.value.trim();
+      if (!/^#[0-9a-f]{6}$/i.test(value)) return;
+      hsv = hexToHsv(value);
+      paint(true);
+    });
+    this.onScroll = () => {
+      if (panel.matches(":popover-open")) place();
+    };
+    this.scrollTarget = view.scrollDOM;
+    view.scrollDOM.addEventListener("scroll", this.onScroll);
+    document.body.append(panel);
+    button.popoverTargetElement = panel;
+    this.panel = panel;
+    paint();
+    swatch.append(button);
     return swatch;
   }
 }

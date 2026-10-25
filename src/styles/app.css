@@ -906,29 +906,94 @@ select:disabled {
   vertical-align: -0.1em;
   line-height: 0;
 }
-.cm-editor .cm-color-swatch input {
+.cm-editor .cm-color-swatch button {
   display: block;
-  box-sizing: border-box;
   width: 100%;
   height: 100%;
   margin: 0;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 2px;
-  background: transparent;
+  background: var(--cm-color);
   cursor: pointer;
 }
-.cm-editor .cm-color-swatch input::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-.cm-editor .cm-color-swatch input::-webkit-color-swatch {
-  border: 0;
-  border-radius: 1px;
+.cm-editor .cm-color-swatch button:hover {
   background: var(--cm-color);
 }
-.cm-editor .cm-color-swatch input:focus-visible {
+.cm-editor .cm-color-swatch button:focus-visible {
   outline: 1px solid var(--focus);
   outline-offset: 1px;
+}
+.cm-color-picker {
+  position: fixed;
+  inset: auto;
+  width: 188px;
+  margin: 0;
+  padding: 8px;
+  overflow: visible;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--raised);
+  color: var(--fg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+}
+.cm-color-field {
+  position: relative;
+  height: 120px;
+  border-radius: 2px;
+  background:
+    linear-gradient(to top, #000, transparent),
+    linear-gradient(to right, #fff, transparent), var(--cm-hue, #f00);
+  cursor: crosshair;
+  touch-action: none;
+}
+.cm-color-thumb {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px #000;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.cm-color-hue {
+  display: block;
+  width: 100%;
+  height: 12px;
+  margin: 8px 0;
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  background: linear-gradient(
+    to right,
+    #f00,
+    #ff0,
+    #0f0,
+    #0ff,
+    #00f,
+    #f0f,
+    #f00
+  );
+}
+.cm-color-hue::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #111;
+  border-radius: 50%;
+  background: #fff;
+}
+.cm-color-hex {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-code);
 }
 
 /* One theme color for every file type; no installed icon font required. */
