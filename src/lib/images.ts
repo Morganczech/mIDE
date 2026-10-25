@@ -109,11 +109,13 @@ export interface ImagePreferences {
   thumbnails: boolean;
   imageHover: boolean;
   htmlHover: boolean;
+  cssHover: boolean;
 }
 export const preferenceLabels: Record<keyof ImagePreferences, string> = {
   thumbnails: "Image thumbnails in gutter",
   imageHover: "Image previews on hover",
   htmlHover: "HTML documentation on hover",
+  cssHover: "CSS documentation on hover",
 };
 export function loadImagePreferences(): ImagePreferences {
   return Object.fromEntries(

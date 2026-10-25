@@ -1,3 +1,5 @@
+import { cssReferences } from "./css-references";
+import { cssDocumentation, mdnCssUrl } from "./css-docs";
 import {
   Prec,
   StateEffect,
@@ -119,7 +121,7 @@ export function previewExtensions(
   path: string,
   preferences: ImagePreferences,
 ): Extension {
-  if (!/\.(html?|jsx|tsx|astro|mdx)$/i.test(path)) return [];
+  if (!/\.(css|html?|jsx|tsx|astro|mdx)$/i.test(path)) return [];
   const plugin = ViewPlugin.fromClass(
     class {
       images = new Map<number, LoadedImage[]>();
@@ -149,7 +151,7 @@ export function previewExtensions(
         const epoch = ++this.epoch,
           state = this.view.state;
         this.images = new Map();
-        if (!preferences.thumbnails) return;
+        if (!preferences.thumbnails || /\.css$/i.test(path)) return;
         const refs = this.view.visibleRanges
           .flatMap((range) => codeReferences(state, path, range.from, range.to))
           .filter((ref) => ref.type === "image" && ref.path);
@@ -191,7 +193,7 @@ export function previewExtensions(
   return [
     tipState,
     plugin,
-    ...(preferences.thumbnails
+    ...(preferences.thumbnails && !/\.css$/i.test(path)
       ? [
           gutter({
             class: "cm-image-gutter",
@@ -212,25 +214,38 @@ export function previewExtensions(
       async (view, pos) => {
         const state = view.state;
         const line = state.doc.lineAt(pos);
-        const ref = codeReferences(state, path, line.from, line.to).find(
+        const ref = [
+          ...codeReferences(state, path, line.from, line.to),
+          ...(preferences.cssHover
+            ? cssReferences(state, path, line.from, line.to)
+            : []),
+        ].find(
           (ref) =>
             pos >= ref.from &&
             pos <= ref.to &&
             (ref.type === "image"
               ? preferences.imageHover
-              : preferences.htmlHover),
+              : ref.type === "css"
+                ? preferences.cssHover
+                : preferences.htmlHover),
         );
         if (!ref) return null;
         let dom: HTMLElement;
-        if (ref.type === "tag") {
+        if (ref.type === "tag" || ref.type === "css") {
           dom = document.createElement("div");
           dom.className = "html-hover-card";
           const title = document.createElement("strong");
-          title.textContent = `<${ref.value}>`;
+          title.textContent = ref.type === "css" ? ref.value : `<${ref.value}>`;
           const description = document.createElement("p");
-          description.textContent = htmlDescriptions[ref.value];
+          description.textContent =
+            ref.type === "css"
+              ? cssDocumentation[ref.value].description
+              : htmlDescriptions[ref.value];
           const link = document.createElement("a");
-          link.href = mdnElementUrl(ref.value);
+          link.href =
+            ref.type === "css"
+              ? mdnCssUrl(ref.value)
+              : mdnElementUrl(ref.value);
           link.textContent = "Read on MDN";
           link.addEventListener("click", (event) => {
             event.preventDefault();
@@ -238,7 +253,14 @@ export function previewExtensions(
               description.textContent = errorMessage(error);
             });
           });
-          dom.append(title, description, link);
+          dom.append(title, description);
+          if (ref.type === "css") {
+            const example = document.createElement("code");
+            example.className = "css-hover-example";
+            example.textContent = cssDocumentation[ref.value].example;
+            dom.append(example);
+          }
+          dom.append(link);
         } else {
           try {
             if (!ref.path)

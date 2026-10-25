@@ -1,3 +1,5 @@
+import { Troubleshooting } from "./Troubleshooting";
+import { findTroubleshootingGuides } from "../lib/troubleshooting";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { backend, errorMessage } from "../lib/backend";
 import {
@@ -38,6 +40,7 @@ export function Sources({ close }: { close: () => void }) {
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All categories");
+  const [guidesOpen, setGuidesOpen] = useState(false);
   const [filter, setFilter] = useState<SourceFilter>("All");
   const [editing, setEditing] = useState<Source | null>(null);
   const [pendingImport, setPendingImport] = useState<SourcesState | null>(null);
@@ -85,6 +88,7 @@ export function Sources({ close }: { close: () => void }) {
     }
   }
   function edit(source?: Source) {
+    setGuidesOpen(false);
     setEditing(
       source ?? {
         id: `custom-${crypto.randomUUID()}`,
@@ -149,15 +153,19 @@ export function Sources({ close }: { close: () => void }) {
           <button onClick={close}>Back to Editor</button>
         </header>
         <p className="sources-intro">
-          Documentation, assets and tools for your next web project. Links open
-          in your browser.
+          Documentation, troubleshooting guides, assets and tools for your next
+          web project. Links open in your browser.
         </p>
         <div className="sources-toolbar">
           <input
             ref={search}
             type="search"
             aria-label="Search sources"
-            placeholder="Search sources, topics or domains"
+            placeholder={
+              guidesOpen
+                ? "Search troubleshooting guides"
+                : "Search sources, topics or domains"
+            }
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -203,6 +211,7 @@ export function Sources({ close }: { close: () => void }) {
               </button>
               <button
                 onClick={(event) => {
+                  setGuidesOpen(false);
                   setFilter("Hidden sources");
                   event.currentTarget
                     .closest("details")
@@ -345,11 +354,21 @@ export function Sources({ close }: { close: () => void }) {
         )}
         <div className="sources-layout">
           <nav className="sources-categories" aria-label="Source categories">
+            <button
+              aria-pressed={guidesOpen}
+              onClick={() => setGuidesOpen(true)}
+            >
+              <span>Troubleshooting</span>
+              <span>{findTroubleshootingGuides(query).length}</span>
+            </button>
             {["All categories", ...categories].map((name) => (
               <button
                 key={name}
-                aria-pressed={category === name}
-                onClick={() => setCategory(name)}
+                aria-pressed={!guidesOpen && category === name}
+                onClick={() => {
+                  setGuidesOpen(false);
+                  setCategory(name);
+                }}
               >
                 <span>{name}</span>
                 <span>{filterSources(data, filter, name, query).length}</span>
@@ -357,198 +376,212 @@ export function Sources({ close }: { close: () => void }) {
             ))}
           </nav>
           <div className="sources-results">
-            <div
-              className="sources-filters"
-              role="group"
-              aria-label="Source collection"
-            >
-              {(["All", "Favorites", "My sources"] as SourceFilter[]).map(
-                (name) => (
-                  <button
-                    key={name}
-                    aria-pressed={filter === name}
-                    onClick={() => setFilter(name)}
-                  >
-                    {name}
-                  </button>
-                ),
-              )}
-              {filter === "Hidden sources" && (
-                <button aria-pressed="true" onClick={() => setFilter("All")}>
-                  Hidden sources
-                </button>
-              )}
-            </div>
-            <p className="sources-count" role="status">
-              {items.length} {items.length === 1 ? "source" : "sources"}
-            </p>
-            {items.length === 0 && (
-              <div className="sources-empty">
-                <h2>
-                  {query || category !== "All categories"
-                    ? "No matching sources"
-                    : filter === "Favorites"
-                      ? "No favorites yet"
-                      : filter === "My sources"
-                        ? "Your collection starts here"
-                        : "No hidden sources"}
-                </h2>
-                <p>
-                  {filter === "Favorites"
-                    ? "Use the star beside a source to keep it here."
-                    : filter === "My sources"
-                      ? "Add a source or save a built-in source as your own."
-                      : "Try another category or clear your search."}
-                </p>
-                {(query || category !== "All categories") && (
-                  <button
-                    onClick={() => {
-                      setQuery("");
-                      setCategory("All categories");
-                    }}
-                  >
-                    Clear filters
-                  </button>
-                )}
-              </div>
-            )}
-            <ul className="sources-list">
-              {items.map((source) => {
-                const builtin = builtinSources.some(
-                  (item) => item.id === source.id,
-                );
-                const favorite = data.favoriteIds.includes(source.id);
-                return (
-                  <li key={source.id} className="source-row">
-                    <button
-                      className="source-star"
-                      aria-label={`${favorite ? "Remove" : "Add"} ${source.title} ${favorite ? "from" : "to"} favorites`}
-                      aria-pressed={favorite}
-                      onClick={() =>
-                        commit({
-                          ...data,
-                          favoriteIds: favorite
-                            ? data.favoriteIds.filter((id) => id !== source.id)
-                            : [...data.favoriteIds, source.id],
-                        })
-                      }
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                        fill={favorite ? "currentColor" : "none"}
-                        stroke="currentColor"
-                        strokeWidth="1.6"
+            {guidesOpen ? (
+              <Troubleshooting query={query} />
+            ) : (
+              <>
+                <div
+                  className="sources-filters"
+                  role="group"
+                  aria-label="Source collection"
+                >
+                  {(["All", "Favorites", "My sources"] as SourceFilter[]).map(
+                    (name) => (
+                      <button
+                        key={name}
+                        aria-pressed={filter === name}
+                        onClick={() => setFilter(name)}
                       >
-                        <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z" />
-                      </svg>
+                        {name}
+                      </button>
+                    ),
+                  )}
+                  {filter === "Hidden sources" && (
+                    <button
+                      aria-pressed="true"
+                      onClick={() => setFilter("All")}
+                    >
+                      Hidden sources
                     </button>
-                    <div className="source-copy">
-                      <a
-                        href={source.url}
-                        onClick={(event) => {
-                          event.preventDefault();
-                          void task(async () =>
-                            backend.openSourceUrl(source.url),
-                          );
+                  )}
+                </div>
+                <p className="sources-count" role="status">
+                  {items.length} {items.length === 1 ? "source" : "sources"}
+                </p>
+                {items.length === 0 && (
+                  <div className="sources-empty">
+                    <h2>
+                      {query || category !== "All categories"
+                        ? "No matching sources"
+                        : filter === "Favorites"
+                          ? "No favorites yet"
+                          : filter === "My sources"
+                            ? "Your collection starts here"
+                            : "No hidden sources"}
+                    </h2>
+                    <p>
+                      {filter === "Favorites"
+                        ? "Use the star beside a source to keep it here."
+                        : filter === "My sources"
+                          ? "Add a source or save a built-in source as your own."
+                          : "Try another category or clear your search."}
+                    </p>
+                    {(query || category !== "All categories") && (
+                      <button
+                        onClick={() => {
+                          setQuery("");
+                          setCategory("All categories");
                         }}
                       >
-                        {source.title}
-                        <span className="source-external" aria-hidden="true">
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                )}
+                <ul className="sources-list">
+                  {items.map((source) => {
+                    const builtin = builtinSources.some(
+                      (item) => item.id === source.id,
+                    );
+                    const favorite = data.favoriteIds.includes(source.id);
+                    return (
+                      <li key={source.id} className="source-row">
+                        <button
+                          className="source-star"
+                          aria-label={`${favorite ? "Remove" : "Add"} ${source.title} ${favorite ? "from" : "to"} favorites`}
+                          aria-pressed={favorite}
+                          onClick={() =>
+                            commit({
+                              ...data,
+                              favoriteIds: favorite
+                                ? data.favoriteIds.filter(
+                                    (id) => id !== source.id,
+                                  )
+                                : [...data.favoriteIds, source.id],
+                            })
+                          }
+                        >
                           <svg
-                            viewBox="0 0 16 16"
-                            fill="none"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                            fill={favorite ? "currentColor" : "none"}
                             stroke="currentColor"
-                            strokeWidth="1.3"
+                            strokeWidth="1.6"
                           >
-                            <path d="M6 3H3v10h10v-3M9 3h4v4M7 9l6-6" />
+                            <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9Z" />
                           </svg>
-                        </span>
-                      </a>
-                      <span className="source-domain">
-                        {new URL(source.url).hostname}
-                      </span>
-                      <p>{source.description}</p>
-                      <div className="source-tags">
-                        {source.tags.map((tag) => (
-                          <span key={tag}>{tag}</span>
-                        ))}
-                        {!builtin && <span>My source</span>}
-                      </div>
-                    </div>
-                    <details className="sources-options source-actions">
-                      <summary aria-label={`Actions for ${source.title}`}>
-                        Actions
-                      </summary>
-                      <div>
-                        {builtin ? (
-                          filter === "Hidden sources" ? (
-                            <button
-                              onClick={() =>
-                                commit({
-                                  ...data,
-                                  hiddenBuiltinIds:
-                                    data.hiddenBuiltinIds.filter(
-                                      (id) => id !== source.id,
-                                    ),
-                                })
-                              }
+                        </button>
+                        <div className="source-copy">
+                          <a
+                            href={source.url}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              void task(async () =>
+                                backend.openSourceUrl(source.url),
+                              );
+                            }}
+                          >
+                            {source.title}
+                            <span
+                              className="source-external"
+                              aria-hidden="true"
                             >
-                              Restore source
-                            </button>
-                          ) : (
-                            <>
-                              <button
-                                onClick={(event) => {
-                                  event.currentTarget
-                                    .closest("details")
-                                    ?.removeAttribute("open");
-                                  edit({
-                                    ...source,
-                                    id: `custom-${crypto.randomUUID()}`,
-                                  });
-                                }}
+                              <svg
+                                viewBox="0 0 16 16"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.3"
                               >
-                                Save as my source
-                              </button>
-                              <button
-                                onClick={() =>
-                                  commit({
-                                    ...data,
-                                    hiddenBuiltinIds: [
-                                      ...data.hiddenBuiltinIds,
-                                      source.id,
-                                    ],
-                                  })
-                                }
-                              >
-                                Hide source
-                              </button>
-                            </>
-                          )
-                        ) : (
-                          <>
-                            <button
-                              onClick={(event) => {
-                                event.currentTarget
-                                  .closest("details")
-                                  ?.removeAttribute("open");
-                                edit(source);
-                              }}
-                            >
-                              Edit source
-                            </button>
-                            <button onClick={() => remove(source)}>
-                              Delete source
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </details>
-                  </li>
-                );
-              })}
-            </ul>
+                                <path d="M6 3H3v10h10v-3M9 3h4v4M7 9l6-6" />
+                              </svg>
+                            </span>
+                          </a>
+                          <span className="source-domain">
+                            {new URL(source.url).hostname}
+                          </span>
+                          <p>{source.description}</p>
+                          <div className="source-tags">
+                            {source.tags.map((tag) => (
+                              <span key={tag}>{tag}</span>
+                            ))}
+                            {!builtin && <span>My source</span>}
+                          </div>
+                        </div>
+                        <details className="sources-options source-actions">
+                          <summary aria-label={`Actions for ${source.title}`}>
+                            Actions
+                          </summary>
+                          <div>
+                            {builtin ? (
+                              filter === "Hidden sources" ? (
+                                <button
+                                  onClick={() =>
+                                    commit({
+                                      ...data,
+                                      hiddenBuiltinIds:
+                                        data.hiddenBuiltinIds.filter(
+                                          (id) => id !== source.id,
+                                        ),
+                                    })
+                                  }
+                                >
+                                  Restore source
+                                </button>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={(event) => {
+                                      event.currentTarget
+                                        .closest("details")
+                                        ?.removeAttribute("open");
+                                      edit({
+                                        ...source,
+                                        id: `custom-${crypto.randomUUID()}`,
+                                      });
+                                    }}
+                                  >
+                                    Save as my source
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      commit({
+                                        ...data,
+                                        hiddenBuiltinIds: [
+                                          ...data.hiddenBuiltinIds,
+                                          source.id,
+                                        ],
+                                      })
+                                    }
+                                  >
+                                    Hide source
+                                  </button>
+                                </>
+                              )
+                            ) : (
+                              <>
+                                <button
+                                  onClick={(event) => {
+                                    event.currentTarget
+                                      .closest("details")
+                                      ?.removeAttribute("open");
+                                    edit(source);
+                                  }}
+                                >
+                                  Edit source
+                                </button>
+                                <button onClick={() => remove(source)}>
+                                  Delete source
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </details>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
           </div>
         </div>
       </div>

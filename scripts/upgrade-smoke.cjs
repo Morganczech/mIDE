@@ -20,6 +20,7 @@ const assert = require("node:assert/strict");
         '<footer>\n  <img src="image.svg"><img src="image.svg">\n  <img src="missing.png">\n</footer>',
       "image.svg": svg,
       "other.ts": "const x = 1;",
+      "styles.css": ".card { display: flex; margin: 1rem; }",
     };
     const folders = ["assets"];
     const callbacks = {};
@@ -168,6 +169,61 @@ const assert = require("node:assert/strict");
   await page.screenshot({ path: "/tmp/mide-upgrade-hover.png" });
   await page.locator(".cm-content").click();
   await page.keyboard.press("Escape");
+  await page.getByRole("treeitem", { name: "styles.css", exact: true }).click();
+  await page
+    .locator(".cm-content span")
+    .filter({ hasText: /^display$/ })
+    .first()
+    .hover();
+  await page.locator(".css-hover-example").waitFor();
+  assert.equal(
+    await page.locator(".css-hover-example").textContent(),
+    "display: flex;",
+  );
+  await page.getByRole("link", { name: "Read on MDN", exact: true }).click();
+  assert(
+    await page.evaluate(() =>
+      window.__mock.calls.some(
+        (call) =>
+          call.command === "open_source_url" &&
+          call.args.url.endsWith("/Properties/display"),
+      ),
+    ),
+  );
+  await page.locator(".cm-content").click();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: /^Settings/ }).click();
+  await page
+    .getByLabel("CSS documentation on hover", { exact: true })
+    .uncheck();
+  assert(
+    await page
+      .getByLabel("HTML documentation on hover", { exact: true })
+      .isChecked(),
+  );
+  await page.getByRole("button", { name: "Back to Editor" }).click();
+  await page
+    .locator(".cm-content span")
+    .filter({ hasText: /^display$/ })
+    .first()
+    .hover();
+  await page.waitForTimeout(700);
+  assert.equal(await page.locator(".css-hover-example").count(), 0);
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: /^Settings/ }).click();
+  await page.getByLabel("CSS documentation on hover", { exact: true }).check();
+  await page.getByRole("button", { name: "Back to Editor" }).click();
+  await page
+    .locator(".cm-content span")
+    .filter({ hasText: /^display$/ })
+    .first()
+    .hover();
+  await page.locator(".css-hover-example").waitFor();
+  await page.screenshot({ path: "/tmp/mide-css-help.png" });
+  await page
+    .getByRole("button", { name: "Close styles.css", exact: true })
+    .click();
   await page.getByRole("treeitem", { name: "image.svg" }).click();
   await page.locator(".image-canvas img").waitFor();
   assert.equal(await page.getByRole("tab").count(), 2);
@@ -226,7 +282,7 @@ const assert = require("node:assert/strict");
   );
   await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("menuitem", { name: /^Settings/ }).click();
-  assert.equal(await page.getByRole("checkbox").count(), 3); // Three independent image/documentation preferences.
+  assert.equal(await page.getByRole("checkbox").count(), 4); // Independent image, HTML and CSS preferences.
   await page
     .getByLabel("Image thumbnails in gutter", { exact: true })
     .uncheck();
@@ -347,6 +403,59 @@ const assert = require("node:assert/strict");
   await page.setViewportSize({ width: 600, height: 400 });
   assert(await page.locator(".cm-content").isVisible());
   await page.screenshot({ path: "/tmp/mide-upgrade-small.png" });
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Sources", exact: true }).click();
+  await page.getByRole("button", { name: /^Troubleshooting/ }).click();
+  await page
+    .locator("summary")
+    .filter({ hasText: /^CSS is not loading$/ })
+    .click();
+  assert(
+    await page.getByText("Inspect the request", { exact: true }).isVisible(),
+  );
+  await page.screenshot({ path: "/tmp/mide-troubleshooting-small.png" });
+  await page
+    .getByRole("searchbox", { name: "Search sources" })
+    .fill("button console");
+  assert.equal(await page.locator(".troubleshooting-guide").count(), 1);
+  await page
+    .locator("summary")
+    .filter({ hasText: /^A button does nothing$/ })
+    .click();
+  await page
+    .getByRole("link", { name: "Read more on MDN", exact: true })
+    .click();
+  assert(
+    await page.evaluate(() =>
+      window.__mock.calls.some(
+        (call) =>
+          call.command === "open_source_url" &&
+          call.args.url.endsWith("/What_went_wrong"),
+      ),
+    ),
+  );
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator(".troubleshooting-guide[open]").count(), 0);
+  assert(
+    await page
+      .getByRole("heading", { name: "Sources", exact: true })
+      .isVisible(),
+  );
+  await page
+    .getByRole("searchbox", { name: "Search sources" })
+    .fill("nonexistent-symptom");
+  assert(await page.getByText(/No matching guides/).isVisible());
+  await page.getByRole("searchbox", { name: "Search sources" }).fill("");
+  await page.getByRole("button", { name: /^All categories/ }).click();
+  assert(await page.locator(".sources-filters").isVisible());
+  await page.getByRole("button", { name: /^Troubleshooting/ }).click();
+  await page.setViewportSize({ width: 1100, height: 760 });
+  await page
+    .locator("summary")
+    .filter({ hasText: /^CSS is not loading$/ })
+    .click();
+  await page.screenshot({ path: "/tmp/mide-troubleshooting.png" });
+  await page.getByRole("button", { name: "Back to Editor" }).click();
   await page.reload();
   await page
     .getByRole("heading", { name: "Recent projects", exact: true })

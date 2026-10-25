@@ -1630,3 +1630,53 @@ select:disabled {
   border-radius: 0;
   color: var(--muted);
 }
+
+.css-hover-example {
+  display: block;
+  margin: 8px 0;
+  padding: 6px 8px;
+  background: var(--bg);
+  font: 12px/1.5 var(--font-code);
+  white-space: pre-wrap;
+}
+.troubleshooting h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+.troubleshooting-guide {
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+  max-width: 75ch;
+}
+.troubleshooting-guide summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
+.troubleshooting-guide p {
+  line-height: 1.65;
+  margin: 8px 0 12px;
+}
+.troubleshooting-guide ol {
+  margin: 16px 0;
+  padding-left: 24px;
+}
+.troubleshooting-guide li {
+  padding-left: 4px;
+  margin-bottom: 20px;
+}
+.troubleshooting-guide pre {
+  padding: 10px 12px;
+  background: var(--bg);
+  overflow: auto;
+  font: 12px/1.6 var(--font-code);
+}
+.troubleshooting-guide a {
+  color: var(--fg);
+  text-underline-offset: 3px;
+}
+.troubleshooting-guide summary:focus-visible,
+.troubleshooting-guide a:focus-visible {
+  outline: 1px solid var(--focus);
+  outline-offset: 3px;
+}
