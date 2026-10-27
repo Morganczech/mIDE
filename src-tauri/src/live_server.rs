@@ -7,7 +7,7 @@ use std::net::{Ipv4Addr, TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::State;
@@ -60,7 +60,10 @@ fn percent_decode(value: &str) -> Option<String> {
     let mut out = Vec::with_capacity(bytes.len());
     let mut index = 0;
     while index < bytes.len() {
-        if bytes[index] == b'%' && index + 2 < bytes.len() {
+        if bytes[index] == b'%' {
+            if index + 2 >= bytes.len() {
+                return None;
+            }
             let hex = std::str::from_utf8(&bytes[index + 1..index + 3]).ok()?;
             out.push(u8::from_str_radix(hex, 16).ok()?);
             index += 3;
@@ -75,7 +78,7 @@ fn percent_decode(value: &str) -> Option<String> {
 fn relative_target(target: &str) -> Option<PathBuf> {
     let path = target.split(['?', '#']).next().unwrap_or("");
     let decoded = percent_decode(path)?;
-    if decoded.contains('\0') || decoded.contains('\\') {
+    if decoded.chars().any(char::is_control) || decoded.contains('\\') {
         return None;
     }
     if decoded.split('/').any(|part| part == "..") {
@@ -92,6 +95,39 @@ fn relative_target(target: &str) -> Option<PathBuf> {
     Some(relative)
 }
 
+// Hidden metadata is never public; only a root .well-known directory is exempt.
+fn public_path(path: &Path) -> bool {
+    path.components().enumerate().all(|(index, component)| {
+        let Component::Normal(name) = component else {
+            return false;
+        };
+        let Some(name) = name.to_str() else {
+            return false;
+        };
+        !name.chars().any(char::is_control)
+            && !name.contains('\\')
+            && (!cfg!(windows) || !name.contains(':'))
+            && (!name.starts_with('.') || (index == 0 && name == ".well-known"))
+    })
+}
+
+fn public_canonical(root: &Path, path: &Path) -> bool {
+    path.strip_prefix(root).is_ok_and(public_path)
+}
+
+fn encode_segment(value: &str) -> String {
+    let mut encoded = String::new();
+    for byte in value.bytes() {
+        if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
+            encoded.push(byte as char);
+        } else {
+            use std::fmt::Write;
+            let _ = write!(encoded, "%{byte:02X}");
+        }
+    }
+    encoded
+}
+
 fn inside(root: &Path, relative: &Path) -> Option<PathBuf> {
     let mut current = root.to_path_buf();
     if relative.as_os_str().is_empty() {
@@ -103,7 +139,7 @@ fn inside(root: &Path, relative: &Path) -> Option<PathBuf> {
                 current.push(part);
                 if current.symlink_metadata().is_ok() {
                     current = current.canonicalize().ok()?;
-                    if !current.starts_with(root) {
+                    if !public_canonical(root, &current) {
                         return None;
                     }
                 }
@@ -147,19 +183,29 @@ fn escape_html(value: &str) -> String {
         .replace('"', "&quot;")
 }
 
-fn directory_listing(path: &Path) -> Option<String> {
+const MAX_FILE_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_DIRECTORY_ENTRIES: usize = 2048;
+
+fn directory_listing(root: &Path, path: &Path) -> Option<String> {
     let mut names = Vec::new();
-    for entry in fs::read_dir(path).ok()? {
+    for (count, entry) in fs::read_dir(path).ok()?.enumerate() {
+        if count >= MAX_DIRECTORY_ENTRIES {
+            return None;
+        }
         let entry = entry.ok()?;
         if let Some(name) = entry.file_name().to_str() {
-            names.push(name.to_string());
+            let relative = entry.path().strip_prefix(root).ok()?.to_owned();
+            if public_path(&relative) && inside(root, &relative).is_some() {
+                names.push(name.to_string());
+            }
         }
     }
     names.sort();
     let mut html = String::from("<!DOCTYPE html><title>Index</title><ul>");
     for name in names {
         let escaped = escape_html(&name);
-        html.push_str(&format!("<li><a href=\"{escaped}\">{escaped}</a></li>"));
+        let href = escape_html(&format!("./{}", encode_segment(&name)));
+        html.push_str(&format!("<li><a href=\"{href}\">{escaped}</a></li>"));
     }
     html.push_str("</ul>");
     Some(inject_reload(&html))
@@ -173,7 +219,7 @@ fn redirect_location(relative: &Path) -> String {
     let mut location = String::from("/");
     for component in relative.components() {
         if let Component::Normal(part) = component {
-            location.push_str(&part.to_string_lossy());
+            location.push_str(&encode_segment(&part.to_string_lossy()));
             location.push('/');
         }
     }
@@ -189,7 +235,7 @@ fn directory_index_reply(
         return Ok(None);
     }
     let canonical = index.canonicalize().map_err(|_| not_found())?;
-    if !canonical.starts_with(root) || !canonical.is_file() {
+    if !public_canonical(root, &canonical) || !canonical.is_file() {
         return Err(not_found());
     }
     Ok(Some(file_reply(&canonical)))
@@ -215,6 +261,9 @@ pub fn respond(root: &Path, method: &str, target: &str) -> LiveReply {
     let Some(relative) = relative_target(target) else {
         return not_found();
     };
+    if !public_path(&relative) {
+        return not_found();
+    }
     let Some(path) = inside(&root, &relative) else {
         return not_found();
     };
@@ -234,7 +283,7 @@ pub fn respond(root: &Path, method: &str, target: &str) -> LiveReply {
             Ok(None) => {}
             Err(reply) => return reply,
         }
-        return match directory_listing(&path) {
+        return match directory_listing(&root, &path) {
             Some(html) => reply(200, "text/html; charset=utf-8", html),
             None => not_found(),
         };
@@ -246,15 +295,49 @@ pub fn respond(root: &Path, method: &str, target: &str) -> LiveReply {
 }
 
 fn file_reply(path: &Path) -> LiveReply {
-    let Ok(bytes) = fs::read(path) else {
+    let Ok(file) = fs::File::open(path) else {
         return not_found();
     };
+    let Ok(metadata) = file.metadata() else {
+        return not_found();
+    };
+    if !metadata.is_file() {
+        return not_found();
+    }
+    if metadata.len() > MAX_FILE_BYTES {
+        return reply(
+            413,
+            "text/plain; charset=utf-8",
+            "File exceeds 16 MiB limit",
+        );
+    }
+    let mut bytes = Vec::new();
+    if file
+        .take(MAX_FILE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .is_err()
+    {
+        return not_found();
+    }
+    if bytes.len() as u64 > MAX_FILE_BYTES {
+        return reply(
+            413,
+            "text/plain; charset=utf-8",
+            "File exceeds 16 MiB limit",
+        );
+    }
     let kind = content_type(path);
     if kind.starts_with("text/html") {
         let html = String::from_utf8_lossy(&bytes);
         reply(200, kind, inject_reload(&html))
     } else {
-        reply(200, kind, bytes)
+        LiveReply {
+            status: 200,
+            content_type: kind,
+            location: None,
+            body: bytes,
+            events: false,
+        }
     }
 }
 
@@ -302,101 +385,314 @@ impl Debounce {
     }
 }
 
-fn read_request(stream: &mut TcpStream) -> std::io::Result<(String, String)> {
-    let mut buffer = Vec::new();
-    let mut byte = [0];
-    while buffer.len() < 8192 {
-        if stream.read(&mut byte)? == 0 {
-            break;
+const MAX_HEADER_BYTES: usize = 8192;
+
+// Deliberately accept only bodyless origin-form requests. No proxying or pipelining.
+fn parse_request(bytes: &[u8], port: u16) -> std::result::Result<(&str, &str), u16> {
+    let text = std::str::from_utf8(bytes).map_err(|_| 400u16)?;
+    let text = text.strip_suffix("\r\n\r\n").ok_or(400u16)?;
+    let mut lines = text.split("\r\n");
+    let mut request = lines.next().ok_or(400u16)?.split(' ');
+    let method = request.next().ok_or(400u16)?;
+    let target = request.next().ok_or(400u16)?;
+    if request.next() != Some("HTTP/1.1")
+        || request.next().is_some()
+        || method.is_empty()
+        || !method.bytes().all(|b| b.is_ascii_uppercase())
+        || !target.starts_with('/')
+        || target.starts_with("//")
+        || target.bytes().any(|b| b.is_ascii_control() || b == b' ')
+    {
+        return Err(400);
+    }
+    let mut host = None;
+    let mut length = None;
+    for line in lines {
+        let (name, value) = line.split_once(':').ok_or(400u16)?;
+        if name.is_empty()
+            || !name
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b))
+            || value.bytes().any(|b| b.is_ascii_control() && b != b'\t')
+        {
+            return Err(400);
         }
-        buffer.push(byte[0]);
-        if buffer.ends_with(b"\r\n\r\n") {
-            break;
+        let value = value.trim_matches([' ', '\t']);
+        if name.eq_ignore_ascii_case("host") && host.replace(value).is_some() {
+            return Err(400);
+        }
+        if name.eq_ignore_ascii_case("transfer-encoding") {
+            return Err(400);
+        }
+        if name.eq_ignore_ascii_case("content-length")
+            && (length.replace(value).is_some() || value != "0")
+        {
+            return Err(400);
         }
     }
-    let text = String::from_utf8_lossy(&buffer);
-    let mut parts = text.lines().next().unwrap_or("").split_whitespace();
-    let method = parts.next().unwrap_or("").to_string();
-    let target = parts.next().unwrap_or("/").to_string();
-    if method.is_empty() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "request",
-        ));
+    let host = host.ok_or(400u16)?;
+    if !host.eq_ignore_ascii_case(&format!("localhost:{port}"))
+        && host != format!("127.0.0.1:{port}")
+    {
+        return Err(403);
     }
     Ok((method, target))
 }
 
-fn write_reply(stream: &mut TcpStream, reply: &LiveReply) -> std::io::Result<()> {
-    let reason = match reply.status {
+fn response_bytes(response: LiveReply) -> Vec<u8> {
+    // Defense in depth: never serialize a control character into a header.
+    if response
+        .location
+        .as_ref()
+        .is_some_and(|s| s.chars().any(char::is_control))
+    {
+        return response_bytes(reply(400, "text/plain; charset=utf-8", "Invalid location"));
+    }
+    let reason = match response.status {
         200 => "OK",
         302 => "Found",
+        400 => "Bad Request",
+        403 => "Forbidden",
         404 => "Not Found",
         405 => "Method Not Allowed",
-        _ => "OK",
+        413 => "Content Too Large",
+        431 => "Request Header Fields Too Large",
+        503 => "Service Unavailable",
+        _ => "Error",
     };
-    write!(stream, "HTTP/1.1 {} {reason}\r\n", reply.status)?;
-    write!(stream, "Content-Type: {}\r\n", reply.content_type)?;
-    if let Some(location) = &reply.location {
-        write!(stream, "Location: {location}\r\n")?;
+    let mut headers = format!("HTTP/1.1 {} {reason}\r\nContent-Type: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n", response.status, response.content_type);
+    if let Some(location) = response.location {
+        headers.push_str(&format!("Location: {location}\r\n"));
     }
-    write!(
-        stream,
-        "Content-Length: {}\r\nConnection: close\r\n\r\n",
-        reply.body.len()
-    )?;
-    stream.write_all(&reply.body)
+    if response.events {
+        headers.push_str("Connection: keep-alive\r\n\r\n");
+    } else {
+        headers.push_str(&format!(
+            "Content-Length: {}\r\nConnection: close\r\n\r\n",
+            response.body.len()
+        ));
+    }
+    let mut bytes = headers.into_bytes();
+    bytes.extend_from_slice(&response.body);
+    bytes
+}
+
+#[derive(Clone, Copy)]
+struct Limits {
+    clients: usize,
+    events: usize,
+    request_timeout: Duration,
+    write_timeout: Duration,
+}
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            clients: 16,
+            events: 8,
+            request_timeout: Duration::from_secs(5),
+            write_timeout: Duration::from_secs(10),
+        }
+    }
+}
+
+struct Connection {
+    stream: TcpStream,
+    input: Vec<u8>,
+    output: Vec<u8>,
+    written: usize,
+    responded: bool,
+    events: bool,
+    reload_pending: bool,
+    deadline: Instant,
+    heartbeat: Instant,
+}
+impl Connection {
+    fn new(stream: TcpStream, limits: Limits) -> std::io::Result<Self> {
+        stream.set_nonblocking(true)?;
+        Ok(Self {
+            stream,
+            input: Vec::new(),
+            output: Vec::new(),
+            written: 0,
+            responded: false,
+            events: false,
+            reload_pending: false,
+            deadline: Instant::now() + limits.request_timeout,
+            heartbeat: Instant::now(),
+        })
+    }
+
+    fn queue(&mut self, response: LiveReply, limits: Limits) {
+        self.events = response.events;
+        self.output = response_bytes(response);
+        self.responded = true;
+        self.input.clear();
+        self.written = 0;
+        self.deadline = Instant::now() + limits.write_timeout;
+    }
+
+    // Each tick does bounded nonblocking IO. Slow clients cannot hold up stop or peers.
+    fn tick(
+        &mut self,
+        root: &Path,
+        port: u16,
+        limits: Limits,
+        sse_available: bool,
+        reload: bool,
+    ) -> bool {
+        let now = Instant::now();
+        if (!self.responded || !self.output.is_empty()) && now >= self.deadline {
+            return false;
+        }
+        if !self.responded {
+            let mut buffer = [0; 4096];
+            match self.stream.read(&mut buffer) {
+                Ok(0) => return false,
+                Ok(count) => self.input.extend_from_slice(&buffer[..count]),
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => return true,
+                Err(_) => return false,
+            }
+            if let Some(end) = self
+                .input
+                .windows(4)
+                .position(|w| w == b"\r\n\r\n")
+                .map(|i| i + 4)
+            {
+                let response = if end > MAX_HEADER_BYTES {
+                    reply(431, "text/plain; charset=utf-8", "Headers too large")
+                } else {
+                    match parse_request(&self.input[..end], port) {
+                        Ok((method, target)) => {
+                            let response = respond(root, method, target);
+                            if response.events && !sse_available {
+                                reply(
+                                    503,
+                                    "text/plain; charset=utf-8",
+                                    "Too many live reload connections",
+                                )
+                            } else {
+                                response
+                            }
+                        }
+                        Err(status) => {
+                            reply(status, "text/plain; charset=utf-8", "Invalid request")
+                        }
+                    }
+                };
+                self.queue(response, limits);
+            } else if self.input.len() >= MAX_HEADER_BYTES {
+                self.queue(
+                    reply(431, "text/plain; charset=utf-8", "Headers too large"),
+                    limits,
+                );
+            } else {
+                return true;
+            }
+        }
+        if self.events {
+            self.reload_pending |= reload;
+            let mut probe = [0];
+            match self.stream.peek(&mut probe) {
+                Ok(_) => return false, // EOF or unexpected pipelined input
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                Err(_) => return false,
+            }
+            if self.output.is_empty() && (self.reload_pending || now >= self.heartbeat) {
+                self.output = if self.reload_pending {
+                    b"data: reload\n\n".to_vec()
+                } else {
+                    b": heartbeat\n\n".to_vec()
+                };
+                self.reload_pending = false;
+                self.written = 0;
+                self.deadline = now + limits.write_timeout;
+                self.heartbeat = now + Duration::from_secs(15);
+            }
+        }
+        if !self.output.is_empty() {
+            let end = (self.written + 64 * 1024).min(self.output.len());
+            match self.stream.write(&self.output[self.written..end]) {
+                Ok(0) => return false,
+                Ok(count) => self.written += count,
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => return true,
+                Err(_) => return false,
+            }
+            if self.written == self.output.len() {
+                if !self.events {
+                    return false;
+                }
+                self.output.clear();
+                self.written = 0;
+            }
+        }
+        true
+    }
 }
 
 pub fn serve(listener: TcpListener, root: PathBuf, shutdown: Receiver<()>, reloads: Receiver<()>) {
-    listener.set_nonblocking(true).ok();
-    let clients: Arc<Mutex<Vec<TcpStream>>> = Arc::new(Mutex::new(Vec::new()));
-    'serve: loop {
+    serve_with_limits(listener, root, shutdown, reloads, Limits::default());
+}
+
+fn serve_with_limits(
+    listener: TcpListener,
+    root: PathBuf,
+    shutdown: Receiver<()>,
+    reloads: Receiver<()>,
+    limits: Limits,
+) {
+    if listener.set_nonblocking(true).is_err() {
+        return;
+    }
+    let Ok(address) = listener.local_addr() else {
+        return;
+    };
+    let mut clients: Vec<Connection> = Vec::new();
+    loop {
         match shutdown.try_recv() {
             Ok(()) | Err(mpsc::TryRecvError::Disconnected) => break,
             Err(mpsc::TryRecvError::Empty) => {}
         }
-        let mut accepted = false;
-        loop {
+        // Bound the accept batch so a connection flood cannot starve cancellation.
+        for _ in 0..limits.clients {
             match listener.accept() {
-                Ok((mut stream, _)) => {
-                    accepted = true;
-                    stream.set_nonblocking(false).ok();
-                    stream.set_read_timeout(Some(Duration::from_secs(5))).ok();
-                    let Ok((method, target)) = read_request(&mut stream) else {
-                        continue;
-                    };
-                    let response = respond(&root, &method, &target);
-                    if response.events {
-                        let headers = b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: keep-alive\r\n\r\n";
-                        if stream.write_all(headers).is_ok() {
-                            stream.set_nonblocking(true).ok();
-                            if let Ok(mut clients) = clients.lock() {
-                                clients.push(stream);
-                            }
-                        }
-                    } else {
-                        write_reply(&mut stream, &response).ok();
+                Ok((stream, _)) if clients.len() < limits.clients => {
+                    if let Ok(client) = Connection::new(stream, limits) {
+                        clients.push(client);
                     }
                 }
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
-                Err(_) => break 'serve,
+                Ok(_) => {} // Drop excess connections without allocating a worker or response.
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => break,
+                Err(_) => return,
             }
         }
-        while reloads.try_recv().is_ok() {
-            if let Ok(mut clients) = clients.lock() {
-                clients.retain_mut(|client| {
-                    client.write_all(b"data: reload\n\n").is_ok() && client.flush().is_ok()
-                });
+        let mut reload = false;
+        for _ in 0..256 {
+            if reloads.try_recv().is_err() {
+                break;
             }
+            reload = true;
         }
-        if !accepted {
-            thread::sleep(Duration::from_millis(20));
-        }
+        let mut events = clients.iter().filter(|c| c.events).count();
+        clients.retain_mut(|client| {
+            let was_event = client.events;
+            let keep = client.tick(
+                &root,
+                address.port(),
+                limits,
+                events < limits.events,
+                reload,
+            );
+            if was_event {
+                events -= 1;
+            }
+            if keep && client.events {
+                events += 1;
+            }
+            keep
+        });
+        thread::sleep(Duration::from_millis(5));
     }
-    if let Ok(mut clients) = clients.lock() {
-        clients.clear();
-    };
+    // Dropping all sockets cancels both incomplete requests and blocked writes/SSE.
 }
 
 pub fn open_browser(url: &str) -> std::io::Result<()> {
@@ -616,7 +912,7 @@ mod tests {
         path
     }
 
-    fn temp() -> PathBuf {
+    pub(super) fn temp() -> PathBuf {
         scratch("mide-live")
     }
 
@@ -661,7 +957,7 @@ mod tests {
         let text = String::from_utf8(reply.body).unwrap();
         assert_eq!(reply.status, 200);
         assert!(text.find("alpha.txt").unwrap() < text.find("zeta").unwrap());
-        assert!(text.contains("href=\"alpha.txt\""));
+        assert!(text.contains("href=\"./alpha.txt\""));
         assert!(text.contains("EventSource"));
         let _ = fs::remove_dir_all(root);
     }
@@ -844,14 +1140,16 @@ mod tests {
         let served = root.clone();
         let thread = std::thread::spawn(move || serve(listener, served, shutdown_rx, reload_rx));
         let mut page = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
-        page.write_all(b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        page.write_all(format!("GET / HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n").as_bytes())
             .unwrap();
         let mut buffer = Vec::new();
         page.read_to_end(&mut buffer).unwrap();
         assert!(String::from_utf8_lossy(&buffer).contains("EventSource"));
         let mut events = TcpStream::connect((Ipv4Addr::LOCALHOST, port)).unwrap();
         events
-            .write_all(b"GET /__mide/live HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+            .write_all(
+                format!("GET /__mide/live HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n").as_bytes(),
+            )
             .unwrap();
         events
             .set_read_timeout(Some(Duration::from_millis(200)))
@@ -911,3 +1209,6 @@ mod tests {
         let _ = fs::remove_dir_all(root);
     }
 }
+
+#[cfg(test)]
+mod security_tests;
