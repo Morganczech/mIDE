@@ -1,0 +1,2 @@
+# Keep the reviewed vendor hashes stable on Windows checkouts.
+src-tauri/vendor/** text eol=lf

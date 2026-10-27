@@ -23,7 +23,8 @@ Všechny čtyři nálezy jsou opravené a ověřené. Samotné úspěšné spuš
 
 ## Navazující priorita — upozornění RustSec v závislostech
 
-- [ ] Posoudit a naplánovat kompatibilní aktualizaci GTK/Tauri řetězce pro `glib 0.18.5` — RUSTSEC-2024-0429 (unsound `VariantStrIter`, opraveno od 0.20.0). Dosažitelnost postiženého kódu v mIDE nebyla prokázána ani vyloučena.
-- [ ] Vyřešit neudržovaný tranzitivní `proc-macro-error 1.0.4` — RUSTSEC-2024-0370.
+- [x] Posoudit kompatibilitu GTK/Tauri a opravit RUSTSEC-2024-0429: lokální GLib 0.18.5 obsahuje převzatou dvouřádkovou opravu z upstreamu. Optimalizovaný regresní test prošel; původ a přesný rozsah backportu se ověřují v CI.
+- [ ] Nahradit neudržovaný tranzitivní `proc-macro-error 1.0.4` — RUSTSEC-2024-0370. `proc-macro-error2` není řešení: má vlastní upozornění RUSTSEC-2026-0173. Je potřeba samostatná migrace chybových cest maker GLib/GTK, včetně compile-fail testů.
+- [ ] Po dostupnosti kompatibilní udržované větve GTK/Tauri odstranit lokální backport GLib a znovu ověřit aplikaci.
 
-Tyto závislosti nebyly v rámci oprav Go Live měněny. Výsledek RustSec není zcela čistý: hlavní seznam zranitelností je prázdný, ale obsahuje uvedená dvě upozornění. Podrobnosti a omezení jsou v aktualizaci auditu.
+Podrobnosti, výsledky a konkrétní plán: [navazující kontrola závislostí](docs/security/dependencies-2026-10-27.md). RustSec neprověřuje lokální zdroj GLib automaticky; proto zachováváme také kontrolu původní registry identity a nepovažujeme zmizení upozornění samo o sobě za důkaz opravy.
