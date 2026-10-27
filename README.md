@@ -4,7 +4,7 @@
 
 It provides the essentials for editing HTML, CSS, JavaScript, TypeScript, React and Astro. It deliberately leaves out code suggestions, automatic completion, auto-closing tags and brackets, AI assistants and language servers. The goal is to give learners a comfortable place to practice writing and understanding their own code.
 
-The current version is **0.4.0**. Linux is the current release target, with AppImage as the download format. **Testing has been performed only on Arch Linux / Omarchy.** Other Linux distributions, macOS and Windows have not been manually verified. Cross-platform code and CI configuration remain in the repository, but do not imply verified support.
+The current version is **0.4.1**. Linux is the current release target, with AppImage as the download format. **Testing has been performed only on Arch Linux / Omarchy.** Other Linux distributions, macOS and Windows have not been manually verified. Cross-platform code and CI configuration remain in the repository, but do not imply verified support.
 
 Tauri 2 · Rust · React · TypeScript · Vite · CodeMirror 6
 
